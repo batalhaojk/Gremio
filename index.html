@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Unificado - Grêmio & Consumo Sala</title>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #071D49 0%, #0d3a7a 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { background: white; border-radius: 12px; padding: 30px; margin-bottom: 30px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); border-left: 5px solid #FFCD05; }
+        .header h1 { color: #071D49; margin-bottom: 10px; }
+        .header p { color: #666; font-size: 14px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); flex-wrap: wrap; }
+        .tab-btn { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s; background: #f0f0f0; color: #333; }
+        .tab-btn.active { background: #071D49; color: #FFCD05; }
+        .tab-btn:hover { transform: translateY(-2px); }
+        .tab-content { display: none; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        .tab-content.active { display: block; }
+        select, input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-primary { background: #071D49; color: #FFCD05; }
+        .btn-secondary { background: #f0f0f0; color: #333; }
+        .btn-danger { background: #ff5252; color: white; }
+        .btn-success { background: #4caf50; color: white; }
+        .btn-whatsapp { background: #25D366; color: white; }
+        .payment-table { width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 20px; }
+        .payment-table th { background: #071D49; color: #FFCD05; padding: 12px; text-align: left; font-size: 13px; }
+        .payment-table td { padding: 12px; border-bottom: 1px solid #e0e0e0; font-size: 13px; }
+        .status-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .status-paid { background: #e8f5e9; color: #2e7d32; }
+        .status-unpaid { background: #ffebee; color: #c62828; }
+        .status-badge:hover { transform: scale(1.05); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .status-badge:active { transform: scale(0.98); }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: linear-gradient(135deg, #071D49 0%, #0d3a7a 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; }
+        .stat-card h3 { font-size: 11px; opacity: 0.9; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-card .value { font-size: 28px; font-weight: 700; }
+        .section-box { border: 1px solid #e0e0e0; padding: 20px; border-radius: 8px; margin-bottom: 25px; background: #fafafa; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 15px; }
+        .product-item { background: white; padding: 10px; border-radius: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; }
+        .product-item-edit { background: white; padding: 12px; border-radius: 6px; border: 1px solid #ddd; display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+        .success-message, .error-message { padding: 15px; border-radius: 8px; margin-bottom: 20px; display: none; }
+        .success-message { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #4caf50; }
+        .error-message { background: #ffebee; color: #c62828; border-left: 4px solid #ff5252; }
+        .show { display: block; }
+        .btn-group { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+        .month-filter-section { background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap; border-left: 4px solid #FFCD05; }
+        .month-filter-section label { font-weight: 600; color: #333; }
+        .month-filter-section select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-width: 150px; }
+        .btn-pdf { background: #d32f2f; color: white; display: inline-flex; align-items: center; gap: 6px; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: white; margin: 5% auto; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); max-height: 85vh; overflow-y: auto; }
+        .close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+
+        /* ==================== RESPONSIVIDADE MOBILE ==================== */
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .container { margin: 0 auto; }
+            .header { padding: 15px; margin-bottom: 15px; }
+            .header h1 { font-size: 18px; margin-bottom: 5px; }
+            .header p { font-size: 12px; }
+            .tabs { gap: 5px; padding: 8px; margin-bottom: 15px; }
+            .tab-btn { padding: 8px 12px; font-size: 12px; }
+            .tab-content { padding: 15px; margin-bottom: 20px; }
+            .section-box { padding: 12px; margin-bottom: 15px; }
+            
+            .payment-table { font-size: 12px; margin-top: 10px; margin-bottom: 10px; }
+            .payment-table th, .payment-table td { padding: 8px; font-size: 11px; }
+            .payment-table th { font-size: 10px; }
+            
+            .btn { padding: 8px 12px; font-size: 12px; gap: 4px; }
+            .btn-group { gap: 5px; }
+            
+            .stat-card { padding: 12px; }
+            .stat-card h3 { font-size: 10px; margin-bottom: 5px; }
+            .stat-card .value { font-size: 20px; }
+            
+            .product-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+            .product-item { padding: 8px; font-size: 11px; }
+            
+            .modal-content { width: 95%; margin: 20% auto; padding: 15px; }
+            .status-badge { font-size: 10px; padding: 3px 6px; }
+            
+            /* Tabelas com scroll horizontal */
+            .table-wrapper { overflow-x: auto; margin-bottom: 10px; }
+            .payment-table { min-width: 500px; }
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 8px; }
+            .header { padding: 12px; margin-bottom: 12px; border-left: 3px solid #FFCD05; }
+            .header h1 { font-size: 16px; }
+            .header p { font-size: 11px; }
+            
+            .tabs { flex-direction: column; gap: 8px; }
+            .tab-btn { width: 100%; padding: 10px; font-size: 13px; }
+            
+            .tab-content { padding: 12px; margin-bottom: 15px; }
+            .section-box { padding: 10px; margin-bottom: 12px; }
+            
+            select, input { padding: 10px; font-size: 14px; }
+            
+            .payment-table { font-size: 11px; margin: 10px 0; }
+            .payment-table th, .payment-table td { padding: 6px; }
+            .payment-table th { font-size: 9px; }
+            .payment-table td { font-size: 10px; }
+            
+            .btn { padding: 10px 12px; font-size: 12px; border-radius: 6px; }
+            .btn-group { flex-direction: column; gap: 8px; }
+            .btn-group .btn { width: 100%; justify-content: center; }
+            
+            .stat-card { padding: 12px; }
+            .stat-card h3 { font-size: 9px; }
+            .stat-card .value { font-size: 18px; }
+            
+            .product-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+            .product-item { padding: 8px; font-size: 10px; }
+            
+            .modal-content { width: 95%; margin: 30% auto; padding: 12px; }
+            .product-item-edit { padding: 8px; }
+            
+            .status-badge { font-size: 9px; padding: 2px 4px; }
+            
+            /* Esconder meses no mobile - apenas mês atual */
+            .mes-antigo { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Painel de Controle Integrado - 3º BPM</h1>
+            <p>Controle Unificado de Mensalidades (Extrato BB) e Consumo da Sala</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" id="btn-tab-mensalidades" onclick="switchTab('mensalidades')">💳 Mensalidades</button>
+            <button class="tab-btn" id="btn-tab-consumo" onclick="switchTab('consumo')">🥤 Consumo da Sala</button>
+            <button class="tab-btn" id="btn-tab-editar-consumo" onclick="switchTab('editar-consumo')">✏️ Editar Consumos</button>
+            <button class="tab-btn" id="btn-tab-relatorio-estoque" onclick="switchTab('relatorio-estoque')">📦 Relatório de Estoque</button>
+            <button class="tab-btn" id="btn-tab-config" onclick="switchTab('config')">⚙️ Configurações</button>
+        </div>
+
+        <div class="success-message" id="globalSuccess"></div>
+        <div class="error-message" id="globalError"></div>
+
+        <div class="tab-content active" id="mensalidades">
+            <div class="stats" id="statsMensalidades"></div>
+            
+            <div class="section-box">
+                <h3>🏦 Ações e Importação</h3>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Importe o extrato ou gere a lista de fiscalização formatada para enviar aos membros do Grêmio.</p>
+                <div class="btn-group">
+                    <button class="btn btn-success" onclick="triggerImport('inputBBPDF')">📄 Importar PDF Extrato</button>
+                    <button class="btn btn-secondary" onclick="triggerImport('inputBBCSV')">📊 Importar CSV</button>
+                    <button class="btn btn-whatsapp" onclick="gerarRelatorioWhatsApp()">📋 Gerar Relatório WhatsApp</button>
+                </div>
+                <input type="file" id="inputBBCSV" style="display:none;" accept=".csv">
+                <input type="file" id="inputBBPDF" style="display:none;" accept=".pdf">
+            </div>
+
+            <h3 style="margin-top: 30px;">📋 Status de Mensalidades</h3>
+            
+            <div class="month-filter-section">
+                <label for="filterMesMensalidades">Filtrar por Mês:</label>
+                <select id="filterMesMensalidades" onchange="aplicarFiltroMensalidades()">
+                    <option value="">-- Todos os Meses --</option>
+                </select>
+                <button class="btn btn-pdf" onclick="exportarMensalidadesPDF()">📥 Exportar PDF</button>
+            </div>
+            
+            <div class="table-wrapper">
+                <table class="payment-table">
+                    <thead>
+                        <tr id="headerMensalidades"></tr>
+                    </thead>
+                    <tbody id="bodyMensalidades"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-content" id="consumo">
+            <div class="section-box">
+                <h3>📋 Tabela de Preços e Identificação Automática</h3>
+                <button class="btn btn-primary" onclick="openEditProductsModal()">✏️ Editar Bebidas e Preços</button>
+                <div class="product-grid" id="listaProdutosPrecos"></div>
+            </div>
+
+            <div class="section-box">
+                <h3>📱 Processar Consumos do CSV</h3>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Selecione o extrato em formato CSV para cruzar os valores recebidos com a tabela de preços acima e deduzir o item consumido.</p>
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="triggerImport('inputConsumoCSV')">📊 Importar CSV para Consumo</button>
+                    <button class="btn btn-whatsapp" onclick="gerarRelatorioConsumoWhatsApp()">📋 Gerar Relatório Consumo WhatsApp</button>
+                </div>
+                <input type="file" id="inputConsumoCSV" style="display:none;" accept=".csv">
+            </div>
+
+            <h3>📋 Relatório Consolidado de Consumo</h3>
+            
+            <div class="month-filter-section">
+                <label for="filterMesConsumo">Filtrar por Mês:</label>
+                <select id="filterMesConsumo" onchange="aplicarFiltroConsumo()">
+                    <option value="">-- Todos os Meses --</option>
+                </select>
+                <button class="btn btn-pdf" onclick="exportarConsumoPDF()">📥 Exportar PDF</button>
+            </div>
+            
+            <div class="table-wrapper">
+                <table class="payment-table">
+                    <thead>
+                        <tr>
+                            <th>Membro / Policial</th>
+                            <th>Mês</th>
+                            <th>Itens Consumidos</th>
+                            <th>Total Pago</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bodyConsumo"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-content" id="editar-consumo">
+            <div class="section-box">
+                <h3>✏️ Editar Consumos Identificados</h3>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Clique em um consumo para corrigir os itens identificados ou remover.</p>
+                <div class="table-wrapper">
+                    <table class="payment-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Membro</th>
+                                <th>Itens Identificados</th>
+                                <th>Valor</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bodyEditarConsumo"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="relatorio-estoque">
+            <div class="month-filter-section">
+                <label for="filterMesEstoque">Filtrar por Mês:</label>
+                <select id="filterMesEstoque" onchange="aplicarFiltroEstoque()">
+                    <option value="">-- Todos os Meses --</option>
+                </select>
+                <button class="btn btn-pdf" onclick="exportarEstoquePDF()">📥 Exportar PDF</button>
+            </div>
+            
+            <div class="section-box">
+                <h3>📦 Relatório de Bebidas por Dia</h3>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Consolidação de consumo diário para fiscalização e reposição de estoque.</p>
+                <div class="table-wrapper">
+                    <table class="payment-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Bebida</th>
+                                <th>Quantidade</th>
+                                <th>Valor Unit.</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bodyRelatorioDia"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section-box">
+                <h3>📊 Resumo por Bebida (Geral)</h3>
+                <div class="table-wrapper">
+                    <table class="payment-table">
+                        <thead>
+                            <tr>
+                                <th>Bebida</th>
+                                <th>Total Consumido</th>
+                                <th>Valor Total</th>
+                                <th>% do Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bodyRelatorioBebida"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="config">
+            <div class="section-box">
+                <h3>➕ Adicionar Novo Membro</h3>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <input type="text" id="newMemberName" placeholder="Nome Completo do Policial" style="flex: 1;">
+                    <button class="btn btn-primary" onclick="addNewMember()">Cadastrar</button>
+                </div>
+            </div>
+
+            <div class="section-box">
+                <h3>👥 Membros Cadastrados</h3>
+                <div id="configMembersList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px;"></div>
+            </div>
+
+            <div class="section-box">
+                <h3>💾 Gerenciamento do Banco de Dados</h3>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="exportDataJSON()">⬇️ Exportar Backup (JSON)</button>
+                    <button class="btn btn-secondary" onclick="triggerImport('importBackupInput')">⬆️ Restaurar Backup</button>
+                    <button class="btn btn-danger" onclick="limparBancoForçado()">⚠️ Resetar Sistema (Forçar 148 Membros)</button>
+                </div>
+                <input type="file" id="importBackupInput" style="display:none;" accept=".json">
+            </div>
+        </div>
+    </div>
+
+    <div id="editProductsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeEditProductsModal()">&times;</span>
+            <h2>✏️ Editar Bebidas e Preços</h2>
+            <div id="productsEditList" style="margin-top: 20px;"></div>
+            <div class="btn-group" style="margin-top: 20px;">
+                <button class="btn btn-success" onclick="saveProducts()">💾 Salvar Mudanças</button>
+                <button class="btn btn-primary" onclick="addNewProduct()">➕ Adicionar Novo Produto</button>
+                <button class="btn btn-secondary" onclick="closeEditProductsModal()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="whatsappModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close-modal" onclick="document.getElementById('whatsappModal').style.display='none'">&times;</span>
+            <h2>📋 Texto para o WhatsApp</h2>
+            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">O texto abaixo já foi copiado automaticamente para sua área de transferência!</p>
+            <textarea id="whatsappTextArea" style="width: 100%; height: 300px; font-family: monospace; font-size: 12px; padding: 10px; border-radius: 6px; border: 1px solid #ddd; resize: none;" readonly></textarea>
+            <div class="btn-group" style="margin-top: 15px; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-whatsapp" onclick="copyWhatsAppText()">📋 Copiar Novamente</button>
+                <button class="btn btn-primary" onclick="document.getElementById('whatsappModal').style.display='none'">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editarConsumoModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close-modal" onclick="closeEditarConsumoModal()">&times;</span>
+            <h2>✏️ Editar Consumo</h2>
+            <div style="margin-top: 20px;">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Membro</label>
+                    <input type="text" id="edEditarMembroConsumo" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Data</label>
+                    <input type="text" id="edEditarDataConsumo" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Valor Total</label>
+                    <input type="text" id="edEditarValorConsumo" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Itens Consumidos</label>
+                    <textarea id="edEditarItensConsumo" style="width: 100%; height: 100px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 12px;" placeholder="Um item por linha"></textarea>
+                    <small style="color: #999; display: block; margin-top: 5px;">Digite os itens separados por quebra de linha ou use +</small>
+                </div>
+            </div>
+            <div class="btn-group" style="margin-top: 20px; justify-content: flex-end;">
+                <button class="btn btn-danger" onclick="removerConsumoEditando()">🗑️ Remover</button>
+                <button class="btn btn-success" onclick="salvarConsumoEditado()">💾 Salvar</button>
+                <button class="btn btn-secondary" onclick="closeEditarConsumoModal()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        try {
+            if (typeof pdfjsLib !== 'undefined') {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            }
+        } catch (e) { console.warn("Aviso PDF worker:", e); }
+
+        const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+        
+        let PRODUTOS = [
+            { nome: "Coca Cola 2L", valor: 8.50 },
+            { nome: "Energético Monster 473ML", valor: 8.50 },
+            { nome: "Energético TNT 473ML", valor: 7.00 },
+            { nome: "Gatorade 500ML", valor: 5.50 },
+            { nome: "H2O 500ML", valor: 5.50 },
+            { nome: "Powerade 500ML", valor: 5.00 },
+            { nome: "Coca Cola Lata 310ML", valor: 3.50 },
+            { nome: "Guarana Lata 350ML", valor: 2.50 },
+            { nome: "Agua Com Gas 500ML", valor: 2.00 },
+            { nome: "Agua Sem Gas 500ML", valor: 1.50 }
+        ];
+
+        const BASE_MEMBERS = [
+            "ANDERSON MOREIRA NEVES", "ADILSON NOBREGA SILVA", "ADRIEL MACARIO DA SILVA", "AFRANIO DA SILVA FERREIRA ARAUJO",
+            "ALBERTO DOS SANTOS CONDE", "ALDALEIA CARFEM B DE O ABREU", "ALESSANDRO ALVES TUCANO", "ALESSHANDRO SISNANDES DOS SANTOS",
+            "ALEXANDRE ARAÚJO BEZERRA", "ALEXSANDER TAFFAREL RIBEIRO PEDROZA", "AMANDA CAROLLINE SILVA LOURENCO", "AMANDA MORAIS RIBEIRO",
+            "ANA CAROLINA D’AVILA MELLO", "ANDRE DE OLIVEIRA DOMINGUES", "ANTONIO CARLOS SANTANA DOS SANTOS", "ANTONIO VELOSO TEIXEIRA SOBRINHO",
+            "AQUILES APARECIDO SALES", "BIANCA CRISTINA MARQUES MARTINS", "BIANCA MIZAEL REZENDE", "BRENER DE SOUZA GONDIM",
+            "BRUNA BACELAR DE ARAÚJO CARVALHO", "BRUNNO MIRANDA DE BARROS", "BRUNO DE CASTRO FERREIRA", "CAIO HENRIQUE DOS SANTOS BRITTO",
+            "CAMILA RODRIGUES AMARAL", "CARLO ESTEVAO CORREA RODRIGUES", "CARLOS ALBERTO DOS SANTOS ALMEIDA", "CARLOS AMERICO B MARINHO",
+            "CARLOS BACELAR SOARES PIRES", "CARLOS EDUARDO ANTUNES CALHEIROS", "CARLOS FABIANO O CELESTINO", "CARLOS ROBERTO DE CARVALHO NETO",
+            "CAROLINE FERREIRA", "CLAUDIO LOPES DA SILVA", "DALMO VILIAN ALVES DE SOUZA", "DANIEL DOS ANJOS DE SOUSA CAMPOS",
+            "DANIEL PALHARES ROCHA", "DANILO DONATO DE SOUSA", "DANILO GOMES DE MORAES SILVA", "DAYANA PARGA DE OLIVEIRA",
+            "DEMETRIUS DOS SANTOS MONTEIRO", "DENIS BORGES DE ARAUJO", "DIEGO REZENDE DE OLIVEIRA", "DJEANINE DA SILVA DANTAS LUIZ",
+            "DOUGLAS ARÚJO DE SOUZA", "DOUGLAS MURAD SOUZA LOPES", "EDER ALVES FERREIRA", "EDSON RICARDO DE ALMEIDA",
+            "EDUARDO ALVES MESQUITA", "EDUARDO HENRICK DE PAIVA BARBOSA", "ELIAS DE SOUZA CHAGAS", "EMILIO MOTA GUIMARAES ROCHA",
+            "FABIO COSTA DE MIRANDA", "FABIO DA SILVA SOUSA", "FABRICIO AIRES RIBEIRO", "FELIPE CONSTANTINO OLIVEIRA BARNASQUE",
+            "FELIPE MANOEL DE SOUSA FRANÇA", "FERNANDA KARINE SILVA DE ABREU", "FERNANDO MATEUS CORREA", "FERNANDO RIBEIRO SANTANA",
+            "FILIPE AUGUSTO VIANA PERREIRA", "FLAVIO ALVES DA SILVA", "FRANCK TEIXEIRA ALVES DA SILVA", "GABRIEL ALVIM DO NASCIMENTO",
+            "GERSON GUILHERME SILVA DE QUEIROZ", "GILCIMAR LONDE RODRIGUES", "GILVAN DA SILVA ALVES", "GIORDANO MATEUS BEZERRA MELO",
+            "GUSTAVO DE PAIVA PALOS FERREIRA", "HALISSON FIGUEIREDO SILVA", "HELDER SANTOS DE OLIVEIRA", "HUGO RODRIGUES OLIVEIRA",
+            "HYGOR MATHEUS PROCOPIO PEREIRA BORGES", "JEAN BATISTA BRENTANO", "JEFFERSON OLIVEIRA DE ARAÚJO", "JESSICA CAROLINE LUCIANO TEODORO",
+            "JOHN LENON RODRIGUES BORGES", "JOHNYWESCLAY BARROS AGUIAR", "JOICE DE SOUZA FRANÇA", "JONAS LIMA JORGE",
+            "JOSÉ EURIPEDES PEREIRA", "JOSÉ OTAVIO MORENO", "KERLEN SILVA RABELO", "LAURO CAMINHA FIUZA LIMA NETO",
+            "LEANDRO AVELINO DE FIGUEREDO", "LEANDRO BRITO GONÇALVES", "LEONARDO AUGUSTO BACELLAR DE NOVAES PAIXÃO", "LEONARDO FERREIRA BARBOSA",
+            "LETÍCIA KALLYNE FRANÇA SANTOS", "LUAN ALMEIDA DE QUADROS", "LUCAS DE FREITAS ALMEIDA", "LUCAS ROCHA MARTINS",
+            "LUIS EDUARDO DESIDERIO O SILVA", "LUIZ MULLER DA SILVA GOMES", "LUIZA REZENDE JORDÃO", "MANOEL NEQUICILIO BRANDAO",
+            "MARCELO BRITO DE LIMA", "MARCELO RABELO MARIANO", "MARCOS HENRIQUE DE SOUSA", "MARCOS VITOR DE SOUSA LOIOLA",
+            "MARCUS VINÍCIUS MONTEIRO COSTA DA SILVA", "MARIANA OLIVEIRA DA COSTA", "MARTHA GABRIELA FERREIRA SCHMIDT ANDRADE", "MATHEUS ANDRADE SILVA",
+            "MATHEUS BRAYAM SOUZA SILVA", "MATHEUS CUSTÓDIO DE ALMEIDA", "MATHEUS FELIPE DE SOUSA COSTA", "MATHEUS NATHANAEL DO NASCIMENTO ABÍLIO",
+            "MIGUEL JUNIOR BARBOMA LIMA PASSOS", "MUBILO PERES DE MORAES", "MURILO SILVEIRA ROCHA", "NAYARA GUEDES DE SOUSA",
+            "NEMIAS MARQUES LIMA COSTA", "NEVERSON MACIEL JAVORSKI", "ORIVALDO PIMENTA", "PABLO PASSOS CARNEIRO",
+            "PAULO CESSAR DE SOUZA MAIA", "PAULO HENRIQUE GUILHERME CRISTAO", "PEDRO FLORENCIO DE QUEIROZ NETO", "PEDRO HENRIQUE AGUIAR MONTEIRO",
+            "PEDRO HENRIQUE PORTO N COSTA", "PEDRO HENRIQUE SILVA SOARES DOS SANTOS", "PRISCILA PEREIRA MARTINIANO DA SILVA", "RAFAEL DE LIMA GUEDES",
+            "RAFAEL DE OLIVEIRA RIBEIRO", "RAFAEL DELMONDES RIBEIRO", "RAFAEL ELIAS VIEIRA MARINS", "RAFAEL MARQUES SIQUEIRA",
+            "RAFAEL TAHAN DA CONCEIÇÃO", "RAFAEL TIAGO LIMA OLIVEIRA", "RANIEL SANTOS MELQUIADES", "RENATA SANTOS DA SILVA SANTANA",
+            "RENE DE ARAUJO COSTA", "RITA DE CÁSSIA SILVA GUSMÃO", "ROBERTO DA SILVA", "RODRIGO ALMEIDA BUENO",
+            "RODRIGO CAMPOS JESUS", "RODRIGO PEREIRA DA SILVA", "RONE DO REGO RODRIGUES", "ROSA VIEIRA ALVES",
+            "SAMUEL QUIRINO MARTINS", "SANDRO DE OLIVEIRA Gomes", "SEBASTIÃO DOMINGOS ARAÚJO NETO", "SIDCLEI LEANDRO GONZAGA SENA",
+            "THALISON FERREIRA DOS SANTOS", "THEO SOARES DOS SANTOS", "THIAGO ANDRADE B SOUZA", "THIAGO CAIXETA DE QUEIROZ MIRANDA",
+            "THIAGO DE ALARCAO R E MENDONÇA", "THIAGO JORGE BARBOSA PEREIRA", "THIAGO MORENO DE MEDEIROS", "THIAGO RODRIGUIES DE ALMEIDA",
+            "THYAGO BEZERRA DO ALENCAR", "VAISTON CUNHA RIBEIRO", "VICTOR PRADO PINTO DE MIRANDA", "VINICIUS DA CUNHA SETTE",
+            "VITOR ROCHA ALVES", "WAGNER BATISTA BORGES DA SILVA", "WAGNER MATHEUS S SANTANA", "WANDERLY RODRIGUES DOS SANTOS",
+            "WARLEY FERREIRA DA SILVA", "WELTON DO NASCIMENTO LEITE", "WERDERSON ERNANI MENDES", "WESLEY GIOTO LIMA DOS SANTOS",
+            "WILLIAN EDUARDO BORGES"
+        ];
+
+        let members = [];
+        let payments = {};
+        let consumoSala = [];
+
+        // ==================== FIREBASE CONFIG ====================
+        const firebaseConfig = {
+            apiKey: "AIzaSyA3tMKENd2RnpaPXYMCPqxKHseWPEc7fTY",
+            authDomain: "gremio3bpm-9476a.firebaseapp.com",
+            projectId: "gremio3bpm-9476a",
+            databaseURL: "https://gremio3bpm-9476a-default-rtdb.firebaseio.com",
+            storageBucket: "gremio3bpm-9476a.firebasestorage.app",
+            messagingSenderId: "722352399609",
+            appId: "1:722352399609:web:f73a009e317c54ae0fee28"
+        };
+
+        let firebaseDB = null;
+        let firebaseReady = false;
+
+        try {
+            const app = firebase.initializeApp(firebaseConfig);
+            firebaseDB = firebase.database();
+            firebaseReady = true;
+            console.log('✅ Firebase pronto');
+        } catch(e) {
+            console.warn('⚠️ Firebase offline - usando localStorage');
+        }
+
+        async function syncToFirebase() {
+            if (!firebaseReady) return;
+            try {
+                await firebaseDB.ref('gremio').set({members, payments, consumoSala});
+                console.log('✅ Sincronizado');
+            } catch(e) {
+                console.warn('⚠️ Erro sync:', e);
+            }
+        }
+
+        async function loadFromFirebaseInit() {
+            if (!firebaseReady) return false;
+            try {
+                const snap = await firebaseDB.ref('gremio').once('value');
+                if (snap.exists()) {
+                    const data = snap.val();
+                    members = data.members || [];
+                    payments = data.payments || {};
+                    consumoSala = data.consumoSala || [];
+                    if (members.length > 0) {
+                        console.log('✅ Carregado Firebase');
+                        return true;
+                    }
+                }
+            } catch(e) {
+                console.warn('⚠️ Erro carregar:', e);
+            }
+            return false;
+        }
+
+        async function init() {
+            const fromFirebase = await loadFromFirebaseInit();
+            if (!fromFirebase) {
+                try { loadStorage(); } catch (e) { localStorage.removeItem('gremio_v3_data'); }
+            }
+            if (!members || members.length === 0) {
+                members = [...BASE_MEMBERS]; payments = {}; consumoSala = []; saveStorage();
+            }
+            vincularEventos();
+            renderAll();
+            populateMonthSelects(); // ✅ CORREÇÃO: Preencher os filtros de mês
+        }
+
+        function vincularEventos() {
+            const elementos = [
+                { id: 'inputBBCSV', handler: processarExtratoBBCSV },
+                { id: 'inputBBPDF', handler: processarExtratoBBPDF },
+                { id: 'inputConsumoCSV', handler: processarConsumoCSV },
+                { id: 'importBackupInput', handler: importarBackupJSON }
+            ];
+            
+            elementos.forEach(el => {
+                const elem = document.getElementById(el.id);
+                if (elem) {
+                    elem.addEventListener('change', el.handler, false);
+                }
+            });
+        }
+
+        function loadStorage() {
+            const saved = localStorage.getItem('gremio_v3_data');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed && typeof parsed === 'object') {
+                    if (Array.isArray(parsed.members) && parsed.members.length > 0) members = parsed.members;
+                    if (parsed.payments) payments = parsed.payments;
+                    if (Array.isArray(parsed.consumoSala)) consumoSala = parsed.consumoSala;
+                    if (Array.isArray(parsed.PRODUTOS) && parsed.PRODUTOS.length > 0) PRODUTOS = parsed.PRODUTOS;
+                }
+            }
+        }
+
+        function saveStorage() {
+            try { localStorage.setItem('gremio_v3_data', JSON.stringify({ members, payments, consumoSala, PRODUTOS })); } catch(e) {}
+            syncToFirebase();
+        }
+
+        function limparBancoForçado() {
+            if (confirm("Deseja mesmo redefinir o sistema para os 148 policiais originais?")) {
+                localStorage.removeItem('gremio_v3_data');
+                members = [...BASE_MEMBERS]; payments = {}; consumoSala = [];
+                saveStorage(); renderAll();
+                showSuccess("✅ Sistema resetado com sucesso!");
+            }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            if(document.getElementById(tabId)) document.getElementById(tabId).classList.add('active');
+            if(document.getElementById(`btn-tab-${tabId}`)) document.getElementById(`btn-tab-${tabId}`).classList.add('active');
+        }
+
+        function triggerImport(id) { if(document.getElementById(id)) document.getElementById(id).click(); }
+
+        // ==================== CORREÇÃO: EXTRATOR MENSALIDADES (R$ 30,00) ====================
+        // ==================== NOVO PARSER PDF - EXTRATO BB (VERSÃO ROBUSTA) ====================
+        async function processarExtratoBBPDF(e) {
+            const file = e.target.files[0]; if (!file) return;
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                let fullText = "";
+                
+                // Extrai TODO o texto do PDF
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    fullText += textContent.items.map(item => item.str).join(" ") + "\n";
+                }
+                
+                let count = 0;
+                
+                // PADRÃO 1: Procura por transações completas
+                // Formato: DATA ... Pix - Recebido ... HORA TIMESTAMP NOME ... VALOR (+)
+                const regexTransacao = /(\d{2})\/(\d{2})\/(\d{4})[^\n]*?Pix\s*-\s*Recebido[^\n]*?(\d{2}):(\d{2})[^\n]*?([\w\sÁÉÍÓÚÃÕÇáéíóúãõç\-]+?)\s+(\d{1,3}[.,]\d{2})\s*\(\+\)/gi;
+                let match;
+                
+                while ((match = regexTransacao.exec(fullText)) !== null) {
+                    const dia = match[1];
+                    const mes = parseInt(match[2], 10) - 1;
+                    const ano = match[3];
+                    const nome = match[6].trim();
+                    const valor = parseValor(match[7]);
+                    
+                    // Validações
+                    if (mes >= 0 && mes <= 11 && Math.abs(valor - 30.00) < 0.05) {
+                        const membro = encontrarMembroPorTexto(nome);
+                        if (membro) {
+                            const dataStr = `${dia}/${String(mes + 1).padStart(2, '0')}/${ano}`;
+                            if (!payments[membro]) payments[membro] = {};
+                            if (!payments[membro][mes]) {
+                                payments[membro][mes] = { date: dataStr, valor: 30.00, fonte: 'PDF BB' };
+                                count++;
+                            }
+                        }
+                    }
+                }
+                
+                // Se regex principal não encontrou, tenta abordagem alternativa (linhas separadas)
+                if (count === 0) {
+                    const linhas = fullText.split(/\n/);
+                    for (let i = 0; i < linhas.length; i++) {
+                        const linha = linhas[i].trim();
+                        const dataMatch = linha.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                        
+                        if (dataMatch && linha.includes("Pix")) {
+                            const dia = dataMatch[1];
+                            const mes = parseInt(dataMatch[2], 10) - 1;
+                            const ano = dataMatch[3];
+                            
+                            // Procura próximas linhas
+                            for (let j = i + 1; j < Math.min(i + 5, linhas.length); j++) {
+                                const proximaLinha = linhas[j].trim();
+                                
+                                // Procura por nome (maiúsculas seguidas)
+                                const nomeMatch = proximaLinha.match(/([\w\sÁÉÍÓÚÃÕÇáéíóúãõç\-]{5,})/);
+                                // Procura por valor
+                                const valorMatch = proximaLinha.match(/(\d{1,3}[.,]\d{2})/);
+                                
+                                if (nomeMatch && valorMatch) {
+                                    const nome = nomeMatch[1].trim();
+                                    const valor = parseValor(valorMatch[1]);
+                                    
+                                    if (mes >= 0 && mes <= 11 && Math.abs(valor - 30.00) < 0.05) {
+                                        const membro = encontrarMembroPorTexto(nome);
+                                        if (membro) {
+                                            const dataStr = `${dia}/${String(mes + 1).padStart(2, '0')}/${ano}`;
+                                            if (!payments[membro]) payments[membro] = {};
+                                            if (!payments[membro][mes]) {
+                                                payments[membro][mes] = { date: dataStr, valor: 30.00, fonte: 'PDF BB' };
+                                                count++;
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                if (count > 0) { saveStorage(); renderAll(); showSuccess(`✅ ${count} pagamentos de R$ 30,00 identificados!`); }
+                else { showError("⚠️ Nenhuma transação nova de R$ 30,00 encontrada no PDF."); }
+            } catch (err) { showError("❌ Erro ao ler PDF: " + err.message); console.error(err); }
+            e.target.value = '';
+        }
+
+        function processarExtratoBBCSV(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const text = evt.target.result;
+                    const linhas = text.split(/\r?\n/);
+                    let count = 0;
+
+                    linhas.forEach(linha => {
+                        const colunas = parseCSVLine(linha);
+                        if (colunas.length >= 4) {
+                            const dataStr = colunas[0].trim();
+                            const descricao = colunas[2].trim();
+                            let valorPago = parseValor(colunas[3]);
+
+                            // Correção de correspondência de floats e strings
+                            if (Math.abs(valorPago - 30.00) < 0.05 || linha.includes("30")) {
+                                if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr) || /^\d{2}\/\d{2}\/\d{2}$/.test(dataStr)) {
+                                    const mesIndex = parseInt(dataStr.split('/')[1], 10) - 1;
+                                    const membro = encontrarMembroPorTexto(descricao);
+                                    if (membro && mesIndex >= 0 && mesIndex <= 11) {
+                                        if (!payments[membro]) payments[membro] = {};
+                                        if (!payments[membro][mesIndex]) {
+                                            payments[membro][mesIndex] = { date: dataStr, valor: 30.00, fonte: 'CSV' };
+                                            count++;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    if (count > 0) { saveStorage(); renderAll(); showSuccess(`✅ ${count} mensalidades processadas do CSV!`); }
+                    else { showError("⚠️ Nenhuma transação nova de R$ 30,00 encontrada no CSV."); }
+                } catch (err) { showError("❌ Erro: " + err.message); }
+            };
+            reader.readAsText(file); e.target.value = '';
+        }
+
+        // ==================== PROCESSAMENTO DE CONSUMO VIA CSV ====================
+        function processarConsumoCSV(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const text = evt.target.result;
+                    const linhas = text.split(/\r?\n/);
+                    let count = 0;
+
+                    const produtosOrdenados = [...PRODUTOS].sort((a, b) => b.valor - a.valor);
+
+                    linhas.forEach(linha => {
+                        const colunas = parseCSVLine(linha);
+                        if (colunas.length >= 4) {
+                            const dataStr = colunas[0].trim();
+                            const descricao = colunas[2].trim();
+                            let valorPago = parseValor(colunas[3]);
+
+                            if (Math.abs(valorPago - 30.00) < 0.01 || valorPago <= 0) return;
+
+                            if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr) || /^\d{2}\/\d{2}\/\d{2}$/.test(dataStr)) {
+                                const mesIndex = parseInt(dataStr.split('/')[1], 10) - 1;
+                                const membro = encontrarMembroPorTexto(descricao);
+
+                                if (membro && mesIndex >= 0 && mesIndex <= 11) {
+                                    const jaExiste = consumoSala.some(c => c.membro === membro && c.data === dataStr && Math.abs(c.valorOriginal - valorPago) < 0.01);
+                                    
+                                    if (!jaExiste) {
+                                        let valorRestante = valorPago;
+                                        let itensDeduzidos = [];
+
+                                        produtosOrdenados.forEach(p => {
+                                            while (valorRestante >= (p.valor - 0.005) && p.valor > 0) {
+                                                itensDeduzidos.push(p.nome);
+                                                valorRestante -= p.valor;
+                                            }
+                                        });
+
+                                        if (itensDeduzidos.length === 0 || valorRestante > 0.05) {
+                                            itensDeduzidos.push(`Consumo Genérico`);
+                                        }
+
+                                        consumoSala.push({
+                                            membro: membro,
+                                            mes: MONTHS[mesIndex],
+                                            item: itensDeduzidos.join(' + '),
+                                            valor: valorPago,
+                                            data: dataStr,
+                                            valorOriginal: valorPago
+                                        });
+                                        count++;
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    if (count > 0) { 
+                        saveStorage(); renderAll(); 
+                        showSuccess(`✅ ${count} transferências de consumo identificadas com sucesso!`); 
+                    } else { 
+                        showError("⚠️ Nenhum consumo novo foi localizado no CSV."); 
+                    }
+                } catch (err) { showError("❌ Erro ao processar CSV de Consumo: " + err.message); }
+            };
+            reader.readAsText(file); e.target.value = '';
+        }
+
+        // ==================== PARSING ROBUSTO DE CSV ====================
+        function parseCSVLine(linha) {
+            if (!linha || linha.trim() === '') return [];
+            
+            // Detecta separador: ; | , | \t (mais comum para ; em locales BR)
+            const hasSemicolon = (linha.match(/;/g) || []).length >= 3;
+            const hasTab = (linha.match(/\t/g) || []).length >= 3;
+            const separator = hasSemicolon ? ';' : (hasTab ? '\t' : ',');
+            
+            // Split respeitando aspas
+            let colunas = [];
+            let coluna = '';
+            let dentroDasAspas = false;
+            
+            for (let i = 0; i < linha.length; i++) {
+                const char = linha[i];
+                
+                if ((char === '"' || char === "'") && (i === 0 || linha[i-1] !== '\\')) {
+                    dentroDasAspas = !dentroDasAspas;
+                    // NÃO adiciona a aspa na coluna
+                } else if (char === separator && !dentroDasAspas) {
+                    colunas.push(coluna.trim());
+                    coluna = '';
+                } else {
+                    coluna += char;
+                }
+            }
+            colunas.push(coluna.trim());
+            
+            // Remove qualquer aspa remanescente dos valores
+            colunas = colunas.map(col => col.replace(/^["']|["']$/g, ''));
+            
+            return colunas;
+        }
+
+        function parseValor(valorStr) {
+            if (!valorStr) return 0;
+            valorStr = String(valorStr).trim();
+            
+            // Remove qualquer aspa remanescente
+            valorStr = valorStr.replace(/["']/g, '');
+            
+            // Remove espaços
+            valorStr = valorStr.trim();
+            
+            if (!valorStr) return 0;
+            
+            // Remove separador de milhares e converte decimal
+            // Detecta se usa , ou . como decimal
+            const temVirgula = valorStr.includes(',');
+            const temPonto = valorStr.includes('.');
+            
+            if (temVirgula && temPonto) {
+                // Ambos presentes: "1.234,56" (BR) ou "1,234.56" (US)
+                if (valorStr.lastIndexOf(',') > valorStr.lastIndexOf('.')) {
+                    // Último é vírgula: formato BR "1.234,56"
+                    return parseFloat(valorStr.replace(/\./g, '').replace(',', '.'));
+                } else {
+                    // Último é ponto: formato US "1,234.56"
+                    return parseFloat(valorStr.replace(/,/g, ''));
+                }
+            } else if (temVirgula) {
+                // Só vírgula: "8,50" ou "1.234,56"
+                return parseFloat(valorStr.replace(/\./g, '').replace(',', '.'));
+            } else if (temPonto) {
+                // Só ponto: "8.50" ou "1234.56"
+                return parseFloat(valorStr);
+            }
+            
+            // Sem separador
+            return parseFloat(valorStr) || 0;
+        }
+
+        function encontrarMembroPorTexto(texto) {
+            if (!texto) return null;
+            let txt = texto.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/PIX RECEBIDO|TRANSFERENCIA|TRANSF|SALDO|LOTE|DOCUMENTO/g, "").replace(/[\/\-\:\,\.\+\(\)]/g, " ").trim();
+            let tokensExtrato = txt.split(/\s+/).filter(t => t.length > 1 && !/^\d+$/.test(t));
+            if (tokensExtrato.length === 0) return null;
+
+            let melhorMembro = null;
+            let melhorPontuacao = 0;
+
+            for (let m of members) {
+                let nomeMembroLimpo = m.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                let tokensMembro = nomeMembroLimpo.split(/\s+/);
+                
+                if (tokensExtrato.length > 0 && tokensMembro.length > 0) {
+                    if (tokensExtrato[0] !== tokensMembro[0] && !tokensMembro[0].startsWith(tokensExtrato[0]) && !tokensExtrato[0].startsWith(tokensMembro[0])) {
+                        continue; 
+                    }
+                }
+
+                let pontos = 0;
+                tokensExtrato.forEach(eToken => {
+                    let achouToken = tokensMembro.some(mToken => mToken.startsWith(eToken) || eToken.startsWith(mToken));
+                    if (achouToken) pontos += eToken.length;
+                });
+
+                if (pontos > melhorPontuacao) {
+                    melhorPontuacao = pontos;
+                    melhorMembro = m;
+                }
+            }
+            return (melhorPontuacao >= 5) ? melhorMembro : null;
+        }
+
+        // ==================== GERAÇÃO DE RELATÓRIOS WHATSAPP ====================
+        function gerarRelatorioWhatsApp() {
+            const hoje = new Date(); const mesCorrenteIndex = hoje.getMonth(); const nomeMesCorrente = MONTHS[mesCorrenteIndex].toUpperCase();
+            let pagosList = []; let devendoList = [];
+            members.forEach(m => {
+                const pago = payments[m] && payments[m][mesCorrenteIndex];
+                if (pago) pagosList.push(`✅ ${m}`); else devendoList.push(`⚠️ ${m}`);
+            });
+            let textoRelatorio = `*RELAÇÃO DE CONTRIBUIÇÕES — MÊS DE ${nomeMesCorrente}/2026*\n*GRÊMIO POLICIAL - 3º BPM*\n_Fiscalização_\n\n📊 *RESUMO:* \n• Total de Membros: ${members.length}\n• Adimplentes (Mês): ${pagosList.length}\n• Pendentes (Mês): ${devendoList.length}\n• Taxa de Adimplência: ${members.length > 0 ? Math.round((pagosList.length / members.length) * 100) : 0}%\n\n-------------------------------------------\n\n🟢 *MEMBROS ADIMPLENTES (${pagosList.length}):*\n` + (pagosList.length === 0 ? `(Nenhum pagamento registrado ainda)\n` : pagosList.join('\n') + `\n`) + `\n🔴 *PENDENTES DE PAGAMENTO (${devendoList.length}):*\n` + (devendoList.length === 0 ? `(Parabéns! 100% adimplente)\n` : devendoList.join('\n') + `\n`) + `\n\n_Gerado automaticamente pelo Painel do Grêmio em ${hoje.toLocaleDateString('pt-BR')}_`;
+            document.getElementById('whatsappTextArea').value = textoRelatorio; document.getElementById('whatsappModal').style.display = 'block';
+            navigator.clipboard.writeText(textoRelatorio).then(() => showSuccess("📋 Relatório copiado para a área de transferência!")).catch(() => {});
+        }
+
+        function copyWhatsAppText() {
+            const texto = document.getElementById('whatsappTextArea').value;
+            navigator.clipboard.writeText(texto).then(() => {
+                showSuccess("✅ Texto copiado para a área de transferência!");
+            }).catch(() => {
+                showError("❌ Erro ao copiar. Tente novamente.");
+            });
+        }
+
+        function gerarRelatorioConsumoWhatsApp() {
+            const hoje = new Date(); const mesCorrenteIndex = hoje.getMonth(); const nomeMesCorrente = MONTHS[mesCorrenteIndex].toUpperCase();
+            const agrupado = {};
+            consumoSala.forEach(c => {
+                if (c.mes === MONTHS[mesCorrenteIndex]) {
+                    if (!agrupado[c.membro]) agrupado[c.membro] = { itens: [], total: 0 };
+                    agrupado[c.membro].itens.push(c.item);
+                    agrupado[c.membro].total += c.valor;
+                }
+            });
+            let textoRelatorio = `*🥤 FISCALIZAÇÃO DE CONSUMO DA SALA — ${nomeMesCorrente}/2026*\n*GRÊMIO POLICIAL - 3º BPM*\n_Rastreamento automático baseado em valores pix de tabela_\n\n`;
+            const chaves = Object.keys(agrupado);
+            if (chaves.length === 0) { textoRelatorio += `ℹ️ Nenhuma movimentação ou consumo de bebida registrado neste mês até o momento.\n`; }
+            else {
+                let totalArrecadadoBebidas = 0;
+                chaves.forEach(membro => {
+                    const dados = agrupado[membro]; totalArrecadadoBebidas += dados.total;
+                    textoRelatorio += `👤 *${membro}*\n   ↳ Produtos: ${dados.itens.join(' | ')}\n   ↳ Total Pago: R$ ${dados.total.toFixed(2).replace('.', ',')}\n\n`;
+                });
+                textoRelatorio += `-------------------------------------------\n💰 *Total Arrecadado (Bebidas):* R$ ${totalArrecadadoBebidas.toFixed(2).replace('.', ',')}\n`;
+            }
+            textoRelatorio += `\n_Gerado para fiscalização mútua em ${hoje.toLocaleDateString('pt-BR')}_`;
+            document.getElementById('whatsappTextArea').value = textoRelatorio; document.getElementById('whatsappModal').style.display = 'block';
+            navigator.clipboard.writeText(textoRelatorio).then(() => showSuccess("📋 Relatório de Consumo copiado para a área de transferência!")).catch(() => {});
+        }
+
+        // ==================== RENDERS ====================
+        function renderAll() {
+            try {
+                renderMensalidadesTableHeader(); renderMensalidadesTableBody(); renderStatsMensalidades();
+                renderProdutosPrecos(); renderConsumoSalaTable(); renderEditarConsumoTable(); renderRelatorioEstoque(); renderConfigMembersList();
+            } catch(e) { console.error(e); }
+        }
+
+        // ==================== VARIÁVEIS DE FILTRO ====================
+        let filtroMesMensalidades = '';
+        let filtroMesConsumo = '';
+        let filtroMesEstoque = '';
+
+        // ==================== POPULAÇÃO E FILTROS ====================
+        function populateMonthSelects() {
+            const selects = [
+                { id: 'filterMesMensalidades' },
+                { id: 'filterMesConsumo' },
+                { id: 'filterMesEstoque' }
+            ];
+            
+            selects.forEach(sel => {
+                const selectEl = document.getElementById(sel.id);
+                if (selectEl && selectEl.options.length === 1) {
+                    MONTHS.forEach((month, idx) => {
+                        const option = document.createElement('option');
+                        option.value = idx;
+                        option.textContent = month.charAt(0).toUpperCase() + month.slice(1);
+                        selectEl.appendChild(option);
+                    });
+                }
+            });
+        }
+
+        function aplicarFiltroMensalidades() {
+            filtroMesMensalidades = document.getElementById('filterMesMensalidades').value;
+            renderMensalidadesTableBody();
+        }
+
+        function aplicarFiltroConsumo() {
+            filtroMesConsumo = document.getElementById('filterMesConsumo').value;
+            renderConsumoSalaTable();
+        }
+
+        function aplicarFiltroEstoque() {
+            filtroMesEstoque = document.getElementById('filterMesEstoque').value;
+            renderRelatorioEstoque();
+        }
+
+        function renderMensalidadesTableHeader() {
+            const h = document.getElementById('headerMensalidades');
+            if(h) {
+                const isMobile = window.innerWidth <= 480;
+                const hoje = new Date();
+                const mesAtualIndex = hoje.getMonth();
+                
+                let headerHtml = '<th>Membro / Policial</th>';
+                MONTHS.forEach((m, idx) => {
+                    const classHidden = isMobile && idx !== mesAtualIndex ? 'mes-antigo' : '';
+                    headerHtml += `<th class="${classHidden}">${m.substring(0,3)}</th>`;
+                });
+                h.innerHTML = headerHtml;
+            }
+        }
+
+        function renderMensalidadesTableBody() {
+            const tbody = document.getElementById('bodyMensalidades');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+            
+            const isMobile = window.innerWidth <= 480;
+            const hoje = new Date();
+            const mesAtualIndex = hoje.getMonth();
+            
+            members.forEach(m => {
+                const row = document.createElement('tr');
+                let html = `<td><strong>${m}</strong></td>`;
+                MONTHS.forEach((month, index) => {
+                    // Aplicar filtro corretamente: se há filtro, mostra apenas o mês filtrado
+                    if (filtroMesMensalidades && parseInt(filtroMesMensalidades) !== index) {
+                        return;
+                    }
+                    
+                    const pago = payments[m] && payments[m][index];
+                    const classHidden = isMobile && index !== mesAtualIndex ? 'mes-antigo' : '';
+                    const badgeClass = pago ? 'status-paid' : 'status-unpaid';
+                    const badgeText = pago ? '✓ R$30' : 'Pendente';
+                    html += `<td class="${classHidden}"><span class="status-badge ${badgeClass}" style="cursor:pointer; transition:all 0.3s;" onclick="toggleMensalidade('${m.replace(/'/g, "\\'")}', ${index})">${badgeText}</span></td>`;
+                });
+                row.innerHTML = html;
+                tbody.appendChild(row);
+            });
+        }
+
+        function toggleMensalidade(membro, mesIndex) {
+            if (!payments[membro]) payments[membro] = {};
+            payments[membro][mesIndex] = !payments[membro][mesIndex];
+            saveStorage();
+            renderMensalidadesTableBody();
+            renderStatsMensalidades();
+            showSuccess(`✅ ${membro} - ${MONTHS[mesIndex]}: ${payments[membro][mesIndex] ? 'Pago ✓' : 'Marcado Pendente'}`);
+        }
+
+        function renderStatsMensalidades() {
+            const container = document.getElementById('statsMensalidades'); if(!container) return;
+            const hoje = new Date(); const mesCorrenteIndex = hoje.getMonth(); const nomeMesCorrente = MONTHS[mesCorrenteIndex];
+            let totalGeralQuitado = 0; let quitadosMesCorrente = 0;
+            Object.keys(payments).forEach(membro => {
+                if (payments[membro]) {
+                    totalGeralQuitado += Object.keys(payments[membro]).length;
+                    if (payments[membro][mesCorrenteIndex]) quitadosMesCorrente++;
+                }
+            });
+            let adimplenciaMesCorrente = members.length > 0 ? Math.round((quitadosMesCorrente / members.length) * 100) : 0;
+            container.innerHTML = `
+                <div class="stat-card"><h3>TOTAL DE POLICIAIS</h3><div class="value">${members.length}</div></div>
+                <div class="stat-card"><h3>QUITADOS EM ${nomeMesCorrente.toUpperCase()}</h3><div class="value">${quitadosMesCorrente}</div></div>
+                <div class="stat-card"><h3>ARRECADAÇÃO TOTAL</h3><div class="value">R$ ${(totalGeralQuitado * 30).toFixed(2).replace('.',',')}</div></div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #FFCD05 0%, #d4aa00 100%); color: #071D49;">
+                    <h3>ADIMPLÊNCIA (${nomeMesCorrente.toUpperCase()})</h3><div class="value">${adimplenciaMesCorrente}%</div>
+                </div>
+            `;
+        }
+
+        function renderProdutosPrecos() {
+            const pList = document.getElementById('listaProdutosPrecos');
+            if(pList) pList.innerHTML = PRODUTOS.map(p => `<div class="product-item"><div style="color:#555; font-size:11px; line-height:1.2;">${p.nome}</div><div style="color:#071D49; font-size:16px; font-weight:bold; margin-top:5px;">R$ ${p.valor.toFixed(2).replace('.', ',')}</div></div>`).join('');
+        }
+
+        function renderConsumoSalaTable() {
+            const tbody = document.getElementById('bodyConsumo'); if(!tbody) return; tbody.innerHTML = '';
+            if (consumoSala.length === 0) { 
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#999;">Nenhum consumo localizado no banco.</td></tr>`; 
+                return; 
+            }
+            const consumoFiltrado = consumoSala.filter(c => {
+                if (!filtroMesConsumo) return true;
+                return c.mes === MONTHS[parseInt(filtroMesConsumo)];
+            });
+            
+            if (consumoFiltrado.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#999;">Nenhum consumo encontrado para este mês.</td></tr>`;
+                return;
+            }
+            
+            consumoFiltrado.forEach(c => {
+                tbody.innerHTML += `<tr>
+                    <td><strong>${c.membro}</strong></td>
+                    <td>${c.mes}</td>
+                    <td><span style="font-size:12px; color:#555;">${c.item} (${c.data})</span></td>
+                    <td><span class="status-badge status-paid">R$ ${c.valor.toFixed(2).replace('.', ',')}</span></td>
+                </tr>`;
+            });
+        }
+
+        function renderEditarConsumoTable() {
+            const tbody = document.getElementById('bodyEditarConsumo'); if(!tbody) return; tbody.innerHTML = '';
+            if (consumoSala.length === 0) { 
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#999;">Nenhum consumo registrado.</td></tr>`; 
+                return; 
+            }
+            consumoSala.forEach((c, idx) => {
+                tbody.innerHTML += `<tr>
+                    <td>${c.data}</td>
+                    <td><strong>${c.membro}</strong></td>
+                    <td><span style="font-size:12px; color:#555;">${c.item}</span></td>
+                    <td>R$ ${c.valor.toFixed(2).replace('.', ',')}</td>
+                    <td><button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="abrirEditarConsumoModal(${idx})">✏️ Editar</button></td>
+                </tr>`;
+            });
+        }
+
+        let consumoEditandoIdx = null;
+        function abrirEditarConsumoModal(idx) {
+            consumoEditandoIdx = idx;
+            const c = consumoSala[idx];
+            document.getElementById('edEditarMembroConsumo').value = c.membro;
+            document.getElementById('edEditarDataConsumo').value = c.data;
+            document.getElementById('edEditarValorConsumo').value = `R$ ${c.valor.toFixed(2).replace('.', ',')}`;
+            document.getElementById('edEditarItensConsumo').value = c.item.replace(/ \+ /g, '\n');
+            document.getElementById('editarConsumoModal').style.display = 'block';
+        }
+        
+        function closeEditarConsumoModal() { 
+            document.getElementById('editarConsumoModal').style.display = 'none'; 
+            consumoEditandoIdx = null;
+        }
+        
+        function salvarConsumoEditado() {
+            if (consumoEditandoIdx === null) return;
+            const itensText = document.getElementById('edEditarItensConsumo').value.trim();
+            if (!itensText) { showError("❌ Digite pelo menos um item."); return; }
+            
+            const novoItem = itensText.split('\n').map(i => i.trim()).filter(i => i).join(' + ');
+            consumoSala[consumoEditandoIdx].item = novoItem;
+            saveStorage(); renderEditarConsumoTable(); closeEditarConsumoModal();
+            showSuccess('✅ Consumo atualizado!');
+        }
+        
+        function removerConsumoEditando() {
+            if (consumoEditandoIdx === null) return;
+            if (confirm('Remover este consumo?')) {
+                consumoSala.splice(consumoEditandoIdx, 1);
+                saveStorage(); renderEditarConsumoTable(); closeEditarConsumoModal();
+                showSuccess('✅ Consumo removido!');
+            }
+        }
+
+        function renderRelatorioEstoque() {
+            // Relatório por dia - CONSOLIDADO
+            const tbodyDia = document.getElementById('bodyRelatorioDia'); if(!tbodyDia) return; tbodyDia.innerHTML = '';
+            
+            // Agrupar por data e bebida (consolidado)
+            const consumoPorDia = {};
+            consumoSala.forEach(c => {
+                // Aplicar filtro de mês
+                if (filtroMesEstoque && c.mes !== MONTHS[parseInt(filtroMesEstoque)]) {
+                    return;
+                }
+                
+                if (!consumoPorDia[c.data]) consumoPorDia[c.data] = {};
+                
+                // Parse itens
+                const itens = c.item.split(' + ').map(i => i.trim());
+                itens.forEach(nomeItem => {
+                    const produto = PRODUTOS.find(p => p.nome.toUpperCase() === nomeItem.toUpperCase());
+                    if (produto) {
+                        if (!consumoPorDia[c.data][nomeItem]) {
+                            consumoPorDia[c.data][nomeItem] = { qtd: 0, valor: produto.valor };
+                        }
+                        consumoPorDia[c.data][nomeItem].qtd += 1;
+                    }
+                });
+            });
+            
+            // Renderizar por dia - consolidado
+            const diasOrdenados = Object.keys(consumoPorDia).sort();
+            if (diasOrdenados.length === 0) {
+                tbodyDia.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#999;">Nenhum consumo registrado.</td></tr>`;
+            } else {
+                diasOrdenados.forEach(data => {
+                    const itensDodia = consumoPorDia[data];
+                    const nomesOrdenados = Object.keys(itensDodia).sort();
+                    
+                    nomesOrdenados.forEach((nomeItem, idx) => {
+                        const item = itensDodia[nomeItem];
+                        const totalItem = (item.qtd * item.valor).toFixed(2);
+                        
+                        // Só mostra data na primeira linha do dia
+                        const dataCell = idx === 0 ? `<td style="font-weight:bold; background:#f0f0f0;">${data}</td>` : `<td style="background:#f0f0f0;"></td>`;
+                        
+                        tbodyDia.innerHTML += `<tr>
+                            ${dataCell}
+                            <td><strong>${nomeItem}</strong></td>
+                            <td style="text-align:center;"><span style="background:#e3f2fd; padding:4px 8px; border-radius:4px; font-weight:bold;">${item.qtd}x</span></td>
+                            <td>R$ ${item.valor.toFixed(2).replace('.', ',')}</td>
+                            <td style="font-weight:bold;">R$ ${totalItem.replace('.', ',')}</td>
+                        </tr>`;
+                    });
+                    
+                    // Subtotal do dia
+                    let subtotalDia = 0;
+                    Object.keys(itensDodia).forEach(nomeItem => {
+                        subtotalDia += itensDodia[nomeItem].qtd * itensDodia[nomeItem].valor;
+                    });
+                    tbodyDia.innerHTML += `<tr style="background:#fff3cd; font-weight:bold;">
+                        <td colspan="3" style="text-align:right;">Subtotal ${data}:</td>
+                        <td></td>
+                        <td>R$ ${subtotalDia.toFixed(2).replace('.', ',')}</td>
+                    </tr>`;
+                });
+                
+                // Total geral
+                let totalGeral = 0;
+                diasOrdenados.forEach(data => {
+                    Object.keys(consumoPorDia[data]).forEach(nomeItem => {
+                        totalGeral += consumoPorDia[data][nomeItem].qtd * consumoPorDia[data][nomeItem].valor;
+                    });
+                });
+                tbodyDia.innerHTML += `<tr style="background:#d4edda; font-weight:bold; font-size:14px;">
+                    <td colspan="3" style="text-align:right;">TOTAL GERAL:</td>
+                    <td></td>
+                    <td>R$ ${totalGeral.toFixed(2).replace('.', ',')}</td>
+                </tr>`;
+            }
+
+            // Relatório consolidado por bebida (GERAL)
+            const tbodyBebida = document.getElementById('bodyRelatorioBebida'); if(!tbodyBebida) return; tbodyBebida.innerHTML = '';
+            
+            const consumoPorBebida = {};
+            let valorTotal = 0;
+            
+            consumoSala.forEach(c => {
+                // Aplicar filtro de mês
+                if (filtroMesEstoque && c.mes !== MONTHS[parseInt(filtroMesEstoque)]) {
+                    return;
+                }
+                
+                const itens = c.item.split(' + ').map(i => i.trim());
+                itens.forEach(nomeItem => {
+                    const produto = PRODUTOS.find(p => p.nome.toUpperCase() === nomeItem.toUpperCase());
+                    if (produto) {
+                        if (!consumoPorBebida[nomeItem]) {
+                            consumoPorBebida[nomeItem] = { qtd: 0, valor: produto.valor };
+                        }
+                        consumoPorBebida[nomeItem].qtd += 1;
+                        valorTotal += produto.valor;
+                    }
+                });
+            });
+            
+            if (Object.keys(consumoPorBebida).length === 0) {
+                tbodyBebida.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#999;">Nenhum consumo registrado.</td></tr>`;
+            } else {
+                Object.keys(consumoPorBebida).sort().forEach(nomeItem => {
+                    const item = consumoPorBebida[nomeItem];
+                    const totalItem = (item.qtd * item.valor);
+                    const percentual = valorTotal > 0 ? ((totalItem / valorTotal) * 100).toFixed(1) : 0;
+                    tbodyBebida.innerHTML += `<tr>
+                        <td><strong>${nomeItem}</strong></td>
+                        <td style="text-align:center;"><span style="background:#e3f2fd; padding:4px 8px; border-radius:4px; font-weight:bold;">${item.qtd}x</span></td>
+                        <td>R$ ${totalItem.toFixed(2).replace('.', ',')}</td>
+                        <td><span style="background:#fff9c4; padding:4px 8px; border-radius:4px; font-weight:bold;">${percentual}%</span></td>
+                    </tr>`;
+                });
+                
+                // Total geral
+                tbodyBebida.innerHTML += `<tr style="background:#d4edda; font-weight:bold; font-size:14px;">
+                    <td>TOTAL</td>
+                    <td style="text-align:center;">-</td>
+                    <td>R$ ${valorTotal.toFixed(2).replace('.', ',')}</td>
+                    <td>100%</td>
+                </tr>`;
+            }
+        }
+
+        function renderConfigMembersList() {
+            const container = document.getElementById('configMembersList'); if(!container) return; container.innerHTML = '';
+            members.forEach(m => {
+                const div = document.createElement('div');
+                div.style.cssText = 'background:white; padding:12px; border-radius:6px; border:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;';
+                div.innerHTML = `<span>${m}</span><button class="btn btn-danger" style="padding:4px 8px; font-size:11px;" onclick="removeMember('${m.replace(/'/g, "\\'")}')">🗑️</button>`;
+                container.appendChild(div);
+            });
+        }
+
+        // ==================== CORREÇÃO EXATA: MODAL DE PRODUTOS RESISTENTE A EXCLUSÕES ====================
+        function openEditProductsModal() {
+            const container = document.getElementById('productsEditList'); if(!container) return; container.innerHTML = '';
+            PRODUTOS.forEach((p) => {
+                container.innerHTML += `
+                <div class="product-item-edit js-prod-row">
+                    <input type="text" class="js-prod-name" value="${p.nome}" placeholder="Nome do Produto">
+                    <div style="display:flex; gap:10px;">
+                        <input type="number" class="js-prod-value" value="${parseFloat(p.valor).toFixed(2)}" step="0.01" style="flex:1;">
+                        <button class="btn btn-danger" onclick="this.parentElement.parentElement.remove()">🗑️</button>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('editProductsModal').style.display = 'block';
+        }
+        
+        function closeEditProductsModal() { document.getElementById('editProductsModal').style.display = 'none'; }
+        
+        function saveProducts() {
+            const rows = document.querySelectorAll('.js-prod-row');
+            let novosProdutos = [];
+            
+            rows.forEach(row => {
+                const nome = row.querySelector('.js-prod-name').value.trim();
+                const valorStr = row.querySelector('.js-prod-value').value.trim();
+                const valor = parseValor(valorStr);
+                if (nome && valor > 0) {
+                    novosProdutos.push({ nome, valor: parseFloat(valor.toFixed(2)) });
+                }
+            });
+
+            if(novosProdutos.length === 0) {
+                showError("❌ Você precisa manter pelo menos 1 bebida válida cadastrada.");
+                return;
+            }
+
+            PRODUTOS = novosProdutos;
+            saveStorage(); renderAll(); closeEditProductsModal(); showSuccess('✅ Lista completa de bebidas e preços atualizada!');
+        }
+        
+        function addNewProduct() {
+            const container = document.getElementById('productsEditList');
+            container.insertAdjacentHTML('beforeend', `
+            <div class="product-item-edit js-prod-row">
+                <input type="text" class="js-prod-name" placeholder="Nova Bebida">
+                <div style="display:flex; gap:10px;">
+                    <input type="number" class="js-prod-value" value="5.00" step="0.01" style="flex:1;">
+                    <button class="btn btn-danger" onclick="this.parentElement.parentElement.remove()">🗑️</button>
+                </div>
+            </div>`);
+        }
+
+        function addNewMember() {
+            const input = document.getElementById('newMemberName'); const name = input.value.trim().toUpperCase(); if (!name) return;
+            if (members.includes(name)) { showError("Este policial já existe."); return; }
+            members.push(name); input.value = ''; saveStorage(); renderAll(); showSuccess("✅ Policial adicionado!");
+        }
+
+        function removeMember(name) {
+            if (confirm(`Remover ${name}?`)) {
+                members = members.filter(m => m !== name); if (payments[name]) delete payments[name];
+                saveStorage(); renderAll(); showSuccess("✅ Membro removido.");
+            }
+        }
+
+        function exportDataJSON() {
+            const blob = new Blob([JSON.stringify({ members, payments, consumoSala, PRODUTOS })], { type: 'application/json' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `backup_gremio.json`; a.click();
+        }
+
+        function importarBackupJSON(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const p = JSON.parse(evt.target.result);
+                    if (p.members) members = p.members; if (p.payments) payments = p.payments; if (p.consumoSala) consumoSala = p.consumoSala; if (p.PRODUTOS) PRODUTOS = p.PRODUTOS;
+                    saveStorage(); renderAll(); showSuccess("✅ Backup restaurado!");
+                } catch (e) { showError("❌ JSON inválido."); }
+            };
+            reader.readAsText(file); e.target.value = '';
+        }
+
+        // ==================== EXPORTAÇÃO EM PDF PESQUISÁVEL ====================
+        function exportarMensalidadesPDF() {
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                const hoje = new Date();
+                const mesAtualIndex = hoje.getMonth();
+                const nomeMesCorrente = MONTHS[mesAtualIndex].toUpperCase();
+                
+                // Cabeçalho
+                doc.setFontSize(16);
+                doc.setFont(undefined, 'bold');
+                doc.text('RELATÓRIO DE MENSALIDADES', 14, 20);
+                
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                doc.text(`Gerado em: ${hoje.toLocaleDateString('pt-BR')}`, 14, 30);
+                doc.text(`Grêmio Policial - 3º BPM`, 14, 37);
+                
+                // Separador
+                doc.setDrawColor(0);
+                doc.line(14, 40, 196, 40);
+                
+                // Dados para a tabela
+                let tableData = [];
+                tableData.push(['Membro', 'Status Mês Atual', 'Total Quitado']);
+                
+                let totalGeral = 0;
+                let quitadosMesCorrente = 0;
+                
+                members.forEach(m => {
+                    const pago = payments[m] && payments[m][mesAtualIndex];
+                    const status = pago ? 'PAGO ✓' : 'PENDENTE';
+                    
+                    let totalMembro = 0;
+                    if (payments[m]) {
+                        Object.keys(payments[m]).forEach(mesIdx => {
+                            if (payments[m][mesIdx]) totalMembro++;
+                        });
+                    }
+                    
+                    if (pago) quitadosMesCorrente++;
+                    totalGeral += totalMembro;
+                    
+                    tableData.push([m, status, `${totalMembro} mês(es)`]);
+                });
+                
+                // Usar autoTable se disponível, senão usar método manual
+                if (doc.autoTable) {
+                    doc.autoTable({
+                        startY: 45,
+                        head: [tableData[0]],
+                        body: tableData.slice(1),
+                        theme: 'grid',
+                        styles: { fontSize: 9, font: 'helvetica' },
+                        headStyles: { fillColor: [7, 29, 73], textColor: [255, 205, 5], fontStyle: 'bold' },
+                        alternateRowStyles: { fillColor: [240, 240, 240] },
+                        margin: { top: 45, left: 14, right: 14 }
+                    });
+                    
+                    const finalY = doc.lastAutoTable.finalY || 200;
+                    doc.setFontSize(11);
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`RESUMO DO MÊS: ${nomeMesCorrente}`, 14, finalY + 10);
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'normal');
+                    doc.text(`Total de Policiais: ${members.length}`, 14, finalY + 18);
+                    doc.text(`Adimplentes (${nomeMesCorrente}): ${quitadosMesCorrente}`, 14, finalY + 25);
+                    doc.text(`Arrecadação Total: R$ ${(totalGeral * 30).toFixed(2).replace('.', ',')}`, 14, finalY + 32);
+                    doc.text(`Taxa de Adimplência: ${members.length > 0 ? Math.round((quitadosMesCorrente / members.length) * 100) : 0}%`, 14, finalY + 39);
+                } else {
+                    // Fallback sem autoTable
+                    let yPos = 50;
+                    tableData.forEach((row, idx) => {
+                        if (idx === 0) {
+                            doc.setFont(undefined, 'bold');
+                            doc.setFillColor(7, 29, 73);
+                            doc.setTextColor(255, 205, 5);
+                        } else {
+                            doc.setFont(undefined, 'normal');
+                            doc.setTextColor(0, 0, 0);
+                            if (idx % 2 === 0) doc.setFillColor(240, 240, 240);
+                            else doc.setFillColor(255, 255, 255);
+                        }
+                        
+                        doc.rect(14, yPos - 5, 182, 6, idx === 0 ? 'F' : 'F');
+                        doc.text(row[0], 16, yPos);
+                        doc.text(row[1], 90, yPos);
+                        doc.text(row[2], 160, yPos);
+                        yPos += 7;
+                        
+                        if (yPos > 280) {
+                            doc.addPage();
+                            yPos = 20;
+                        }
+                    });
+                }
+                
+                doc.save(`mensalidades_${hoje.getFullYear()}-${String(mesAtualIndex + 1).padStart(2, '0')}.pdf`);
+                showSuccess('✅ PDF de mensalidades gerado com sucesso!');
+            } catch (err) {
+                showError('❌ Erro ao gerar PDF: ' + err.message);
+                console.error(err);
+            }
+        }
+
+        function exportarEstoquePDF() {
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('l'); // Landscape
+                
+                const hoje = new Date();
+                const mesAtualIndex = hoje.getMonth();
+                const mesNome = filtroMesEstoque ? MONTHS[parseInt(filtroMesEstoque)] : 'Todos os Meses';
+                
+                // Cabeçalho
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.text('RELATÓRIO DE CONSUMO - ESTOQUE DE BEBIDAS', 14, 15);
+                
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                doc.text(`Período: ${mesNome} | Data: ${hoje.toLocaleDateString('pt-BR')}`, 14, 22);
+                doc.text(`Grêmio Policial - 3º BPM - Fiscalização de Consumo`, 14, 28);
+                
+                // Separador
+                doc.setDrawColor(0);
+                doc.line(14, 31, 270, 31);
+                
+                // Consolidação por bebida
+                const consumoPorBebida = {};
+                let valorTotal = 0;
+                
+                consumoSala.forEach(c => {
+                    if (filtroMesEstoque && c.mes !== MONTHS[parseInt(filtroMesEstoque)]) {
+                        return;
+                    }
+                    const itens = c.item.split(' + ').map(i => i.trim());
+                    itens.forEach(nomeItem => {
+                        const produto = PRODUTOS.find(p => p.nome.toUpperCase() === nomeItem.toUpperCase());
+                        if (produto) {
+                            if (!consumoPorBebida[nomeItem]) {
+                                consumoPorBebida[nomeItem] = { qtd: 0, valor: produto.valor };
+                            }
+                            consumoPorBebida[nomeItem].qtd += 1;
+                            valorTotal += produto.valor;
+                        }
+                    });
+                });
+                
+                if (Object.keys(consumoPorBebida).length === 0) {
+                    doc.setFontSize(11);
+                    doc.text('Nenhum consumo registrado para o período selecionado.', 14, 40);
+                } else {
+                    // Tabela de bebidas
+                    let tableData = [];
+                    tableData.push(['Bebida', 'Quantidade', 'Valor Unitário', 'Total', '% do Total']);
+                    
+                    Object.keys(consumoPorBebida).sort().forEach(nomeItem => {
+                        const item = consumoPorBebida[nomeItem];
+                        const totalItem = item.qtd * item.valor;
+                        const percentual = valorTotal > 0 ? ((totalItem / valorTotal) * 100).toFixed(1) : 0;
+                        
+                        tableData.push([
+                            nomeItem,
+                            `${item.qtd}x`,
+                            `R$ ${item.valor.toFixed(2).replace('.', ',')}`,
+                            `R$ ${totalItem.toFixed(2).replace('.', ',')}`,
+                            `${percentual}%`
+                        ]);
+                    });
+                    
+                    if (doc.autoTable) {
+                        doc.autoTable({
+                            startY: 36,
+                            head: [tableData[0]],
+                            body: tableData.slice(1),
+                            theme: 'grid',
+                            styles: { fontSize: 9, font: 'helvetica' },
+                            headStyles: { fillColor: [7, 29, 73], textColor: [255, 205, 5], fontStyle: 'bold' },
+                            alternateRowStyles: { fillColor: [240, 240, 240] },
+                            margin: { left: 14, right: 14 },
+                            columnStyles: {
+                                1: { halign: 'center' },
+                                2: { halign: 'right' },
+                                3: { halign: 'right' },
+                                4: { halign: 'center' }
+                            }
+                        });
+                        
+                        const finalY = doc.lastAutoTable.finalY || 100;
+                        doc.setFontSize(11);
+                        doc.setFont(undefined, 'bold');
+                        doc.text(`TOTAL GERAL: R$ ${valorTotal.toFixed(2).replace('.', ',')}`, 14, finalY + 8);
+                    }
+                }
+                
+                doc.save(`estoque_bebidas_${hoje.getFullYear()}-${String(mesAtualIndex + 1).padStart(2, '0')}.pdf`);
+                showSuccess('✅ PDF de estoque gerado com sucesso!');
+            } catch (err) {
+                showError('❌ Erro ao gerar PDF: ' + err.message);
+                console.error(err);
+            }
+        }
+
+        function showSuccess(m) { const el = document.getElementById('globalSuccess'); if(el) { el.textContent = m; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000); } }
+        function showError(m) { const el = document.getElementById('globalError'); if(el) { el.textContent = m; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000); } }
+        
+        window.onclick = function(e) { 
+            if (e.target == document.getElementById('editProductsModal')) closeEditProductsModal(); 
+            if (e.target == document.getElementById('whatsappModal')) document.getElementById('whatsappModal').style.display = 'none';
+            if (e.target == document.getElementById('editarConsumoModal')) closeEditarConsumoModal();
+        }
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
