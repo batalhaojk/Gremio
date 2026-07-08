@@ -417,7 +417,7 @@
         
         let PRODUTOS = [
             { nome: "Coca Cola 2L", valor: 8.50 },
-            { nome: "Energético Monster 473ML", valor: 8.50 },
+            { nome: "Energético Monster 473ML", valor: 8.00 },
             { nome: "Energético TNT 473ML", valor: 7.00 },
             { nome: "Gatorade 500ML", valor: 5.50 },
             { nome: "H2O 500ML", valor: 5.50 },
@@ -427,6 +427,50 @@
             { nome: "Agua Com Gas 500ML", valor: 2.00 },
             { nome: "Agua Sem Gas 500ML", valor: 1.50 }
         ];
+        
+        // ==================== PRODUCT MATCHING - EXATO PRIMEIRO, DEPOIS DECOMPOSIÇÃO ====================
+        // Estratégia:
+        // 1. Tenta correspondência EXATA com um produto
+        // 2. Se não achar, tenta decompor usando APENAS produtos cadastrados
+        // 3. Nunca cria nomes genéricos - usa apenas produtos reais
+        function identificarProdutosPorValor(valorTotal) {
+            const TOLERANCIA = 0.005; // R$ 0,005 de tolerância
+            const itensDeduzidos = [];
+            
+            // ========== PASSO 1: Tentar match exato ==========
+            for (let p of PRODUTOS) {
+                if (Math.abs(p.valor - valorTotal) <= TOLERANCIA) {
+                    return [p.nome]; // Match exato encontrado!
+                }
+            }
+            
+            // ========== PASSO 2: Tentar decomposição greedy ==========
+            let valorRestante = valorTotal;
+            const produtosOrdenados = [...PRODUTOS].sort((a, b) => {
+                const diffValor = b.valor - a.valor;
+                if (Math.abs(diffValor) > TOLERANCIA) {
+                    return diffValor; // Ordena por valor descending
+                }
+                return a.nome.localeCompare(b.nome, 'pt-BR'); // Depois alfabético
+            });
+            
+            produtosOrdenados.forEach(p => {
+                while (valorRestante >= (p.valor - TOLERANCIA) && p.valor > 0) {
+                    itensDeduzidos.push(p.nome);
+                    valorRestante -= p.valor;
+                }
+            });
+            
+            // ========== PASSO 3: Validar resultado ==========
+            // Se conseguiu decompor com tolerância aceitável, retorna
+            if (itensDeduzidos.length > 0 && valorRestante <= TOLERANCIA) {
+                return itensDeduzidos;
+            }
+            
+            // ========== PASSO 4: Nenhum produto encaixou - retorna erro ==========
+            // Nota: Isso indica um problema nos dados de entrada (valor não correspondente)
+            return [`⚠️ VALOR NÃO IDENTIFICADO: R$ ${valorTotal.toFixed(2).replace('.', ',')}`];
+        }
 
         const BASE_MEMBERS = [
             "ANDERSON MOREIRA NEVES", "ADILSON NOBREGA SILVA", "ADRIEL MACARIO DA SILVA", "AFRANIO DA SILVA FERREIRA ARAUJO",
@@ -786,8 +830,6 @@
                     const linhas = text.split(/\r?\n/);
                     let count = 0;
 
-                    const produtosOrdenados = [...PRODUTOS].sort((a, b) => b.valor - a.valor);
-
                     linhas.forEach(linha => {
                         const colunas = parseCSVLine(linha);
                         if (colunas.length >= 4) {
@@ -805,19 +847,8 @@
                                     const jaExiste = consumoSala.some(c => c.membro === membro && c.data === dataStr && Math.abs(c.valorOriginal - valorPago) < 0.01);
                                     
                                     if (!jaExiste) {
-                                        let valorRestante = valorPago;
-                                        let itensDeduzidos = [];
-
-                                        produtosOrdenados.forEach(p => {
-                                            while (valorRestante >= (p.valor - 0.005) && p.valor > 0) {
-                                                itensDeduzidos.push(p.nome);
-                                                valorRestante -= p.valor;
-                                            }
-                                        });
-
-                                        if (itensDeduzidos.length === 0 || valorRestante > 0.05) {
-                                            itensDeduzidos.push(`Consumo Genérico`);
-                                        }
+                                        // Use the new deterministic matching function
+                                        const itensDeduzidos = identificarProdutosPorValor(valorPago);
 
                                         consumoSala.push({
                                             membro: membro,
@@ -1529,6 +1560,20 @@
                 
                 // Usar autoTable se disponível, senão usar método manual
                 if (doc.autoTable) {
+                    // Aplicar estilos condicionais às células de status
+                    const didParseCell = ({ cell, row }) => {
+                        if (row.section === 'body' && cell.column.index === 1) {
+                            const cellText = cell.text[0];
+                            if (cellText.includes('PAGO')) {
+                                cell.textColor = [46, 125, 50]; // Verde
+                                cell.fontStyle = 'bold';
+                            } else if (cellText.includes('PENDENTE')) {
+                                cell.textColor = [198, 40, 40]; // Vermelho
+                                cell.fontStyle = 'bold';
+                            }
+                        }
+                    };
+                    
                     doc.autoTable({
                         startY: 45,
                         head: [tableData[0]],
@@ -1537,7 +1582,11 @@
                         styles: { fontSize: 9, font: 'helvetica' },
                         headStyles: { fillColor: [7, 29, 73], textColor: [255, 205, 5], fontStyle: 'bold' },
                         alternateRowStyles: { fillColor: [240, 240, 240] },
-                        margin: { top: 45, left: 14, right: 14 }
+                        margin: { top: 45, left: 14, right: 14 },
+                        columnStyles: {
+                            1: { cellWidth: 50 } // Aumenta a largura da coluna de status
+                        },
+                        didParseCell: didParseCell
                     });
                     
                     const finalY = doc.lastAutoTable.finalY || 200;
