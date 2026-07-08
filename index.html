@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema Unificado - Grêmio & Consumo Sala</title>
-    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
@@ -56,6 +56,26 @@
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
         .modal-content { background-color: white; margin: 5% auto; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); max-height: 85vh; overflow-y: auto; }
         .close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+
+        /* ==================== STATUS FIREBASE ==================== */
+        .firebase-status { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .firebase-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .firebase-status-checking { background: #fff8e1; color: #8d6e00; }
+        .firebase-status-checking .firebase-status-dot { background: #ffc107; animation: pulse 1s infinite; }
+        .firebase-status-online { background: #e8f5e9; color: #2e7d32; }
+        .firebase-status-online .firebase-status-dot { background: #4caf50; }
+        .firebase-status-offline { background: #ffebee; color: #c62828; }
+        .firebase-status-offline .firebase-status-dot { background: #ff5252; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .firebase-toast { position: fixed; top: 20px; right: 20px; z-index: 2000; padding: 14px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 10px; transform: translateX(120%); transition: transform 0.35s ease; }
+        .firebase-toast.show { transform: translateX(0); }
+        .firebase-toast.online { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #4caf50; }
+        .firebase-toast.offline { background: #ffebee; color: #c62828; border-left: 4px solid #ff5252; }
+        @media (max-width: 480px) {
+            .firebase-toast { left: 10px; right: 10px; top: 10px; transform: translateY(-150%); }
+            .firebase-toast.show { transform: translateY(0); }
+        }
 
         /* ==================== RESPONSIVIDADE MOBILE ==================== */
         @media (max-width: 768px) {
@@ -136,6 +156,10 @@
         <div class="header">
             <h1>📊 Painel de Controle Integrado - 3º BPM</h1>
             <p>Controle Unificado de Mensalidades (Extrato BB) e Consumo da Sala</p>
+            <div id="firebaseStatusBadge" class="firebase-status firebase-status-checking">
+                <span class="firebase-status-dot"></span>
+                <span class="firebase-status-text">Verificando conexão...</span>
+            </div>
         </div>
 
         <div class="tabs">
@@ -148,6 +172,8 @@
 
         <div class="success-message" id="globalSuccess"></div>
         <div class="error-message" id="globalError"></div>
+
+        <div id="firebaseToast" class="firebase-toast"></div>
 
         <div class="tab-content active" id="mensalidades">
             <div class="stats" id="statsMensalidades"></div>
@@ -467,7 +493,54 @@
             firebaseReady = true;
             console.log('✅ Firebase pronto');
         } catch(e) {
-            console.warn('⚠️ Firebase offline - usando localStorage');
+            console.warn('⚠️ Firebase offline - usando localStorage', e);
+        }
+
+        // ==================== STATUS / POPUP DE CONEXÃO ====================
+        let firebaseConnectedAntes = null; // null = ainda não sabemos
+
+        function setFirebaseStatusUI(estado) {
+            // estado: 'checking' | 'online' | 'offline'
+            const badge = document.getElementById('firebaseStatusBadge');
+            if (!badge) return;
+            badge.classList.remove('firebase-status-checking', 'firebase-status-online', 'firebase-status-offline');
+            const textos = {
+                checking: 'Verificando conexão...',
+                online: '✅ Sincronizado com o Firebase',
+                offline: '⚠️ Sem conexão - usando dados locais'
+            };
+            badge.classList.add('firebase-status-' + estado);
+            badge.querySelector('.firebase-status-text').textContent = textos[estado];
+        }
+
+        function mostrarFirebaseToast(conectado) {
+            const toast = document.getElementById('firebaseToast');
+            if (!toast) return;
+            toast.classList.remove('online', 'offline');
+            toast.classList.add(conectado ? 'online' : 'offline');
+            toast.innerHTML = conectado
+                ? '✅ Conectado e sincronizado com o Firebase'
+                : '⚠️ Sem conexão com o Firebase - salvando localmente';
+            toast.classList.add('show');
+            clearTimeout(toast._hideTimer);
+            toast._hideTimer = setTimeout(() => toast.classList.remove('show'), 5000);
+        }
+
+        function monitorarConexaoFirebase() {
+            if (!firebaseReady) {
+                setFirebaseStatusUI('offline');
+                mostrarFirebaseToast(false);
+                return;
+            }
+            firebase.database().ref('.info/connected').on('value', (snap) => {
+                const conectado = snap.val() === true;
+                setFirebaseStatusUI(conectado ? 'online' : 'offline');
+                // Só exibe o popup quando o estado muda (evita repetir a cada checagem)
+                if (firebaseConnectedAntes !== conectado) {
+                    mostrarFirebaseToast(conectado);
+                    firebaseConnectedAntes = conectado;
+                }
+            });
         }
 
         async function syncToFirebase() {
@@ -501,6 +574,7 @@
         }
 
         async function init() {
+            monitorarConexaoFirebase();
             const fromFirebase = await loadFromFirebaseInit();
             if (!fromFirebase) {
                 try { loadStorage(); } catch (e) { localStorage.removeItem('gremio_v3_data'); }
