@@ -167,6 +167,7 @@
             <button class="tab-btn" id="btn-tab-consumo" onclick="switchTab('consumo')">🥤 Consumo da Sala</button>
             <button class="tab-btn" id="btn-tab-editar-consumo" onclick="switchTab('editar-consumo')">✏️ Editar Consumos</button>
             <button class="tab-btn" id="btn-tab-relatorio-estoque" onclick="switchTab('relatorio-estoque')">📦 Relatório de Estoque</button>
+            <button class="tab-btn" id="btn-tab-controle-estoque" onclick="switchTab('controle-estoque')">📊 Controle de Estoque</button>
             <button class="tab-btn" id="btn-tab-config" onclick="switchTab('config')">⚙️ Configurações</button>
         </div>
 
@@ -235,6 +236,7 @@
                     <option value="">-- Todos os Meses --</option>
                 </select>
                 <button class="btn btn-pdf" onclick="exportarConsumoPDF()">📥 Exportar PDF</button>
+                <button class="btn btn-danger" onclick="limparConsumoMes()" style="background: #dc3545;">🗑️ Limpar Mês</button>
             </div>
             
             <div class="table-wrapper">
@@ -316,6 +318,52 @@
                         <tbody id="bodyRelatorioBebida"></tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="controle-estoque">
+            <div class="section-box">
+                <h3>📊 Cadastrar Estoque Inicial</h3>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Registre o estoque inicial de cada bebida com data e hora. O sistema contará automaticamente o consumo.</p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 15px;">
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px;">Produto</label>
+                        <select id="produtoEstoque" style="width: 100%;">
+                            <option value="">-- Selecione um Produto --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px;">Quantidade (unidades)</label>
+                        <input type="number" id="quantidadeEstoque" placeholder="Ex: 24" min="0" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px;">Data e Hora</label>
+                        <input type="datetime-local" id="dataHoraEstoque" style="width: 100%;">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="cadastrarEstoqueInicial()" style="width: 100%;">✅ Registrar Estoque Inicial</button>
+            </div>
+
+            <h3 style="margin-top: 30px;">📈 Estoque Atual por Produto</h3>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-top: 20px;" id="containerEstoqueAtual"></div>
+
+            <h3 style="margin-top: 30px;">📋 Histórico de Movimentação</h3>
+            
+            <div class="table-wrapper">
+                <table class="payment-table">
+                    <thead>
+                        <tr>
+                            <th>Data/Hora</th>
+                            <th>Produto</th>
+                            <th>Tipo</th>
+                            <th>Quantidade</th>
+                            <th>Saldo</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bodyHistoricoEstoque"></tbody>
+                </table>
             </div>
         </div>
 
@@ -522,6 +570,8 @@
         let members = [];
         let payments = {};
         let consumoSala = [];
+        let estoqueMovimentacoes = []; // Array para armazenar movimentações de estoque
+        let estoqueInicial = {}; // Objeto para armazenar estoque inicial por produto {produto: [{dataHora, quantidade}]}
 
         // ==================== FIREBASE CONFIG ====================
         const firebaseConfig = {
@@ -662,12 +712,14 @@
                     if (parsed.payments) payments = parsed.payments;
                     if (Array.isArray(parsed.consumoSala)) consumoSala = parsed.consumoSala;
                     if (Array.isArray(parsed.PRODUTOS) && parsed.PRODUTOS.length > 0) PRODUTOS = parsed.PRODUTOS;
+                    if (parsed.estoqueInicial) estoqueInicial = parsed.estoqueInicial;
+                    if (Array.isArray(parsed.estoqueMovimentacoes)) estoqueMovimentacoes = parsed.estoqueMovimentacoes;
                 }
             }
         }
 
         function saveStorage() {
-            try { localStorage.setItem('gremio_v3_data', JSON.stringify({ members, payments, consumoSala, PRODUTOS })); } catch(e) {}
+            try { localStorage.setItem('gremio_v3_data', JSON.stringify({ members, payments, consumoSala, PRODUTOS, estoqueInicial, estoqueMovimentacoes })); } catch(e) {}
             syncToFirebase();
         }
 
@@ -1032,11 +1084,258 @@
             navigator.clipboard.writeText(textoRelatorio).then(() => showSuccess("📋 Relatório de Consumo copiado para a área de transferência!")).catch(() => {});
         }
 
-        // ==================== RENDERS ====================
+        // ==================== CONTROLE DE ESTOQUE ====================
+        function cadastrarEstoqueInicial() {
+            const produtoSelect = document.getElementById('produtoEstoque');
+            const quantidade = parseInt(document.getElementById('quantidadeEstoque').value);
+            const dataHora = document.getElementById('dataHoraEstoque').value;
+            
+            if (!produtoSelect.value || !quantidade || !dataHora) {
+                showError('❌ Preencha todos os campos!');
+                return;
+            }
+            
+            const produto = produtoSelect.value;
+            const dataHoraObj = new Date(dataHora);
+            
+            // Armazenar estoque inicial
+            if (!estoqueInicial[produto]) {
+                estoqueInicial[produto] = [];
+            }
+            
+            estoqueInicial[produto].push({
+                dataHora: dataHoraObj.getTime(),
+                dataHoraFormatada: dataHoraObj.toLocaleString('pt-BR'),
+                quantidade: quantidade
+            });
+            
+            // Registrar como movimentação
+            estoqueMovimentacoes.push({
+                dataHora: dataHoraObj.getTime(),
+                dataHoraFormatada: dataHoraObj.toLocaleString('pt-BR'),
+                produto: produto,
+                tipo: 'ENTRADA',
+                quantidade: quantidade
+            });
+            
+            saveStorage();
+            renderEstoqueAtual();
+            renderHistoricoEstoque();
+            
+            // Limpar campos
+            document.getElementById('quantidadeEstoque').value = '';
+            document.getElementById('dataHoraEstoque').value = '';
+            
+            showSuccess(`✅ Estoque inicial de ${produto} cadastrado!`);
+        }
+
+        function calcularEstoqueAtual(produto) {
+            let saldoAtual = 0;
+            
+            // Começar com estoque inicial mais recente antes de agora
+            const agora = Date.now();
+            let maiorDataEstoqueInicial = 0;
+            
+            if (estoqueInicial[produto]) {
+                for (let entrada of estoqueInicial[produto]) {
+                    if (entrada.dataHora <= agora && entrada.dataHora > maiorDataEstoqueInicial) {
+                        maiorDataEstoqueInicial = entrada.dataHora;
+                        saldoAtual = entrada.quantidade;
+                    }
+                }
+            }
+            
+            // Se não há estoque inicial, retornar 0
+            if (maiorDataEstoqueInicial === 0) return 0;
+            
+            // Processar consumos APÓS a data do estoque inicial
+            consumoSala.forEach(consumo => {
+                const dataConsumo = new Date(consumo.data).getTime();
+                
+                // Consumo deve ser após estoque inicial e antes de agora
+                if (dataConsumo >= maiorDataEstoqueInicial && dataConsumo <= agora) {
+                    const itens = consumo.item.split(' + ').map(i => i.trim());
+                    if (itens.includes(produto)) {
+                        saldoAtual--;
+                    }
+                }
+            });
+            
+            return Math.max(0, saldoAtual);
+        }
+
+        function renderEstoqueAtual() {
+            const container = document.getElementById('containerEstoqueAtual');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            PRODUTOS.forEach(produto => {
+                const saldo = calcularEstoqueAtual(produto.nome);
+                const temEstoqueInicial = estoqueInicial[produto.nome] && estoqueInicial[produto.nome].length > 0;
+                
+                if (temEstoqueInicial) {
+                    const statusCor = saldo > 5 ? '#4caf50' : (saldo > 0 ? '#ff9800' : '#f44336');
+                    const statusTexto = saldo > 5 ? 'OK' : (saldo > 0 ? 'BAIXO' : 'VAZIO');
+                    
+                    const card = document.createElement('div');
+                    card.style.cssText = `
+                        background: white;
+                        border-left: 4px solid ${statusCor};
+                        padding: 15px;
+                        border-radius: 8px;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                    `;
+                    
+                    card.innerHTML = `
+                        <div style="font-weight: 600; color: #333; margin-bottom: 10px;">${produto.nome}</div>
+                        <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px;">
+                            <span style="font-size: 28px; font-weight: bold; color: ${statusCor};">${saldo}</span>
+                            <span style="color: #999; font-size: 12px;">unidades</span>
+                        </div>
+                        <div style="background: ${statusCor}; color: white; padding: 3px 8px; border-radius: 4px; display: inline-block; font-size: 11px; font-weight: 600;">
+                            ${statusTexto}
+                        </div>
+                        <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                            R$ ${produto.valor.toFixed(2).replace('.', ',')} / unidade
+                        </div>
+                    `;
+                    
+                    container.appendChild(card);
+                }
+            });
+            
+            if (container.innerHTML === '') {
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #999; padding: 40px;">Nenhum estoque inicial cadastrado ainda.</div>';
+            }
+        }
+
+        function renderHistoricoEstoque() {
+            const tbody = document.getElementById('bodyHistoricoEstoque');
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            
+            // Combinar todas as movimentações (inicial + consumos)
+            let todasMovimentacoes = [];
+            
+            // Adicionar entradas iniciais
+            Object.keys(estoqueInicial).forEach(produto => {
+                estoqueInicial[produto].forEach(entrada => {
+                    todasMovimentacoes.push({
+                        dataHora: entrada.dataHora,
+                        dataHoraFormatada: entrada.dataHoraFormatada,
+                        produto: produto,
+                        tipo: 'ENTRADA',
+                        quantidade: entrada.quantidade
+                    });
+                });
+            });
+            
+            // Adicionar consumos
+            consumoSala.forEach(consumo => {
+                const itens = consumo.item.split(' + ').map(i => i.trim());
+                const dataConsumo = new Date(consumo.data).getTime();
+                
+                itens.forEach(item => {
+                    todasMovimentacoes.push({
+                        dataHora: dataConsumo,
+                        dataHoraFormatada: consumo.data,
+                        produto: item,
+                        tipo: 'SAÍDA',
+                        quantidade: 1
+                    });
+                });
+            });
+            
+            // Ordenar por data (mais recente primeiro)
+            todasMovimentacoes.sort((a, b) => b.dataHora - a.dataHora);
+            
+            // Renderizar
+            todasMovimentacoes.forEach(mov => {
+                const saldoAposMov = calcularEstoqueAtual(mov.produto);
+                const tipoClass = mov.tipo === 'ENTRADA' ? 'status-paid' : 'status-unpaid';
+                const tipoIcon = mov.tipo === 'ENTRADA' ? '➕' : '➖';
+                
+                tbody.innerHTML += `<tr>
+                    <td style="font-size: 12px;">${mov.dataHoraFormatada}</td>
+                    <td><strong>${mov.produto}</strong></td>
+                    <td><span class="status-badge ${tipoClass}">${tipoIcon} ${mov.tipo}</span></td>
+                    <td style="text-align: center;">${mov.quantidade}</td>
+                    <td style="font-weight: 600; color: #071D49;">${saldoAposMov} unid.</td>
+                    <td>
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="removerMovimentacaoEstoque('${mov.dataHora}', '${mov.produto}', '${mov.tipo}')">🗑️</button>
+                    </td>
+                </tr>`;
+            });
+            
+            if (todasMovimentacoes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">Nenhuma movimentação registrada.</td></tr>';
+            }
+        }
+
+        function removerMovimentacaoEstoque(dataHora, produto, tipo) {
+            if (!confirm(`Remover movimentação de ${tipo} de ${produto}?`)) return;
+            
+            const dataHoraNum = parseFloat(dataHora);
+            
+            if (tipo === 'ENTRADA') {
+                if (estoqueInicial[produto]) {
+                    estoqueInicial[produto] = estoqueInicial[produto].filter(e => e.dataHora !== dataHoraNum);
+                }
+            }
+            
+            estoqueMovimentacoes = estoqueMovimentacoes.filter(m => !(m.dataHora === dataHoraNum && m.produto === produto));
+            
+            saveStorage();
+            renderEstoqueAtual();
+            renderHistoricoEstoque();
+            showSuccess('✅ Movimentação removida!');
+        }
+
+        function popularProdutosEstoque() {
+            const select = document.getElementById('produtoEstoque');
+            if (!select) return;
+            
+            select.innerHTML = '<option value="">-- Selecione um Produto --</option>';
+            PRODUTOS.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.nome;
+                option.textContent = p.nome;
+                select.appendChild(option);
+            });
+        }
+
+        // ==================== SALVAMENTO E CARREGAMENTO ====================
+        function salvarEstoqueStorage() {
+            try {
+                const data = {
+                    members,
+                    payments,
+                    consumoSala,
+                    PRODUTOS,
+                    estoqueInicial,
+                    estoqueMovimentacoes
+                };
+                localStorage.setItem('gremio_v3_data', JSON.stringify(data));
+            } catch(e) {}
+        }
+
+        function carregarEstoqueStorage() {
+            try {
+                const data = JSON.parse(localStorage.getItem('gremio_v3_data'));
+                if (data) {
+                    if (data.estoqueInicial) estoqueInicial = data.estoqueInicial;
+                    if (data.estoqueMovimentacoes) estoqueMovimentacoes = data.estoqueMovimentacoes;
+                }
+            } catch(e) {}
+        }
+
         function renderAll() {
             try {
                 renderMensalidadesTableHeader(); renderMensalidadesTableBody(); renderStatsMensalidades();
                 renderProdutosPrecos(); renderConsumoSalaTable(); renderEditarConsumoTable(); renderRelatorioEstoque(); renderConfigMembersList();
+                renderEstoqueAtual(); renderHistoricoEstoque(); popularProdutosEstoque();
             } catch(e) { console.error(e); }
         }
 
@@ -1202,6 +1501,66 @@
                     <td><button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="abrirEditarConsumoModal(${idx})">✏️ Editar</button></td>
                 </tr>`;
             });
+        }
+
+        function limparConsumoMes() {
+            const mesSelect = document.getElementById('filterMesConsumo');
+            const mesIndex = mesSelect.value;
+            
+            // Verificar se um mês foi selecionado
+            if (!mesIndex) {
+                showError('⚠️ Selecione um mês para limpar os dados!');
+                return;
+            }
+            
+            const mesSelecionado = MONTHS[parseInt(mesIndex)];
+            const consumosMes = consumoSala.filter(c => c.mes === mesSelecionado);
+            
+            if (consumosMes.length === 0) {
+                showError('⚠️ Não há consumos a limpar neste mês!');
+                return;
+            }
+            
+            // PRIMEIRO ALERTA - Confirmação inicial
+            const confirmacao1 = confirm(
+                `⚠️ PRIMEIRO AVISO DE EXCLUSÃO\n\n` +
+                `Você está prestes a DELETAR ${consumosMes.length} lançamento(s) de consumo do mês de ${mesSelecionado}.\n\n` +
+                `Clique em "OK" para prosseguir com o segundo aviso de confirmação.`
+            );
+            
+            if (!confirmacao1) {
+                showError('❌ Exclusão cancelada pelo usuário.');
+                return;
+            }
+            
+            // SEGUNDO ALERTA - Confirmação final (mais severa)
+            const confirmacao2 = confirm(
+                `🚨 SEGUNDO AVISO - ÚLTIMA CHANCE\n\n` +
+                `ATENÇÃO! Esta ação é IRREVERSÍVEL!\n\n` +
+                `Você vai deletar permanentemente ${consumosMes.length} lançamento(s) de consumo de ${mesSelecionado}.\n\n` +
+                `Clique em "OK" APENAS se tem CERTEZA absoluta.\n` +
+                `Clique em "Cancelar" para abortar a operação.`
+            );
+            
+            if (!confirmacao2) {
+                showError('❌ Exclusão cancelada pelo usuário no segundo aviso.');
+                return;
+            }
+            
+            // Executar a exclusão
+            const quantidadeAntes = consumoSala.length;
+            consumoSala = consumoSala.filter(c => c.mes !== mesSelecionado);
+            const quantidadeDepois = consumoSala.length;
+            const deletados = quantidadeAntes - quantidadeDepois;
+            
+            saveStorage();
+            renderConsumoSalaTable();
+            renderEditarConsumoTable();
+            renderRelatorioEstoque();
+            renderEstoqueAtual();
+            renderHistoricoEstoque();
+            
+            showSuccess(`✅ ${deletados} lançamento(s) de ${mesSelecionado} foram deletados com sucesso!`);
         }
 
         let consumoEditandoIdx = null;
