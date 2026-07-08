@@ -390,8 +390,12 @@
                 </div>
                 <div style="margin-bottom: 15px;">
                     <label style="display: block; font-weight: bold; margin-bottom: 5px;">Itens Consumidos</label>
-                    <textarea id="edEditarItensConsumo" style="width: 100%; height: 100px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 12px;" placeholder="Um item por linha"></textarea>
-                    <small style="color: #999; display: block; margin-top: 5px;">Digite os itens separados por quebra de linha ou use +</small>
+                    <div id="edEditarItensConsumoLista" style="max-height: 220px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 6px;"></div>
+                    <div style="display: flex; gap: 8px; margin-top: 10px;">
+                        <input type="text" id="edNovoItemPersonalizado" placeholder="Adicionar outro item..." style="flex: 1;">
+                        <button type="button" class="btn btn-secondary" style="padding: 8px 12px; font-size: 12px; white-space: nowrap;" onclick="adicionarItemPersonalizadoEdicao()">+ Adicionar</button>
+                    </div>
+                    <small style="color: #999; display: block; margin-top: 5px;">Marque os itens consumidos ou adicione um item personalizado</small>
                 </div>
             </div>
             <div class="btn-group" style="margin-top: 20px; justify-content: flex-end;">
@@ -1104,7 +1108,7 @@
             let totalGeralQuitado = 0; let quitadosMesCorrente = 0;
             Object.keys(payments).forEach(membro => {
                 if (payments[membro]) {
-                    totalGeralQuitado += Object.keys(payments[membro]).length;
+                    totalGeralQuitado += Object.values(payments[membro]).filter(v => v).length;
                     if (payments[membro][mesCorrenteIndex]) quitadosMesCorrente++;
                 }
             });
@@ -1174,8 +1178,58 @@
             document.getElementById('edEditarMembroConsumo').value = c.membro;
             document.getElementById('edEditarDataConsumo').value = c.data;
             document.getElementById('edEditarValorConsumo').value = `R$ ${c.valor.toFixed(2).replace('.', ',')}`;
-            document.getElementById('edEditarItensConsumo').value = c.item.replace(/ \+ /g, '\n');
+            document.getElementById('edNovoItemPersonalizado').value = '';
+
+            const itensAtuais = c.item.split(' + ').map(i => i.trim()).filter(i => i);
+            renderChecklistItensConsumo(itensAtuais);
+
             document.getElementById('editarConsumoModal').style.display = 'block';
+        }
+
+        function renderChecklistItensConsumo(itensSelecionados) {
+            const container = document.getElementById('edEditarItensConsumoLista');
+            if (!container) return;
+
+            // Une os produtos cadastrados com quaisquer itens já usados neste registro
+            // que não estejam mais na lista de produtos (itens legados/personalizados)
+            const nomesProdutos = PRODUTOS.map(p => p.nome);
+            const extras = itensSelecionados.filter(item =>
+                !nomesProdutos.some(nome => nome.toUpperCase() === item.toUpperCase())
+            );
+            const todosItens = [...nomesProdutos, ...extras];
+
+            container.innerHTML = todosItens.map(nome => {
+                const checked = itensSelecionados.some(item => item.toUpperCase() === nome.toUpperCase());
+                const produto = PRODUTOS.find(p => p.nome.toUpperCase() === nome.toUpperCase());
+                const tag = produto
+                    ? ` <span style="color:#999; font-weight:normal;">(R$ ${produto.valor.toFixed(2).replace('.', ',')})</span>`
+                    : ' <span style="color:#999; font-weight:normal;">(item personalizado)</span>';
+                const nomeEscapado = nome.replace(/"/g, '&quot;');
+                return `<label style="display:flex; align-items:center; gap:8px; padding:7px 4px; border-bottom:1px solid #eee; cursor:pointer; font-size:13px; font-weight:600;">
+                    <input type="checkbox" value="${nomeEscapado}" ${checked ? 'checked' : ''} style="width:16px; height:16px; flex-shrink:0;">
+                    <span>${nome}${tag}</span>
+                </label>`;
+            }).join('');
+        }
+
+        function adicionarItemPersonalizadoEdicao() {
+            const input = document.getElementById('edNovoItemPersonalizado');
+            const nome = input.value.trim();
+            if (!nome) return;
+            const container = document.getElementById('edEditarItensConsumoLista');
+            const jaExiste = Array.from(container.querySelectorAll('input[type=checkbox]'))
+                .some(cb => cb.value.toUpperCase() === nome.toUpperCase());
+            if (jaExiste) {
+                showError('⚠️ Este item já está na lista.');
+                input.value = '';
+                return;
+            }
+            const nomeEscapado = nome.replace(/"/g, '&quot;');
+            container.insertAdjacentHTML('beforeend', `<label style="display:flex; align-items:center; gap:8px; padding:7px 4px; border-bottom:1px solid #eee; cursor:pointer; font-size:13px; font-weight:600;">
+                <input type="checkbox" value="${nomeEscapado}" checked style="width:16px; height:16px; flex-shrink:0;">
+                <span>${nome} <span style="color:#999; font-weight:normal;">(item personalizado)</span></span>
+            </label>`);
+            input.value = '';
         }
         
         function closeEditarConsumoModal() { 
@@ -1185,10 +1239,11 @@
         
         function salvarConsumoEditado() {
             if (consumoEditandoIdx === null) return;
-            const itensText = document.getElementById('edEditarItensConsumo').value.trim();
-            if (!itensText) { showError("❌ Digite pelo menos um item."); return; }
+            const container = document.getElementById('edEditarItensConsumoLista');
+            const selecionados = Array.from(container.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+            if (selecionados.length === 0) { showError("❌ Selecione pelo menos um item."); return; }
             
-            const novoItem = itensText.split('\n').map(i => i.trim()).filter(i => i).join(' + ');
+            const novoItem = selecionados.join(' + ');
             consumoSala[consumoEditandoIdx].item = novoItem;
             saveStorage(); renderEditarConsumoTable(); closeEditarConsumoModal();
             showSuccess('✅ Consumo atualizado!');
