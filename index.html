@@ -416,16 +416,18 @@
         const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
         
         let PRODUTOS = [
-            { nome: "Coca Cola 2L", valor: 8.50 },
-            { nome: "Energético Monster 473ML", valor: 8.00 },
-            { nome: "Energético TNT 473ML", valor: 7.00 },
-            { nome: "Gatorade 500ML", valor: 5.50 },
-            { nome: "H2O 500ML", valor: 5.50 },
-            { nome: "Powerade 500ML", valor: 5.00 },
-            { nome: "Coca Cola Lata 310ML", valor: 3.50 },
-            { nome: "Guarana Lata 350ML", valor: 2.50 },
-            { nome: "Agua Com Gas 500ML", valor: 2.00 },
-            { nome: "Agua Sem Gas 500ML", valor: 1.50 }
+            { nome: "Coca Cola 2L", valor: 8.80 },
+            { nome: "Energético Red Bull", valor: 8.50 },
+            { nome: "Energético Monster 473ML", valor: 8.70 },
+            { nome: "Guarana 2L", valor: 7.50 },
+            { nome: "H2O 500ML", valor: 5.80 },
+            { nome: "Gatorade 500ML", valor: 5.60 },
+            { nome: "Powerade 500ML", valor: 5.15 },
+            { nome: "Coca Cola Lata 310ML", valor: 3.60 },
+            { nome: "Guaramix 500ML", valor: 3.50 },
+            { nome: "Guarana Lata 350ML", valor: 2.65 },
+            { nome: "Agua Com Gas 500ML", valor: 2.20 },
+            { nome: "Agua Sem Gas 500ML", valor: 1.55 }
         ];
         
         // ==================== PRODUCT MATCHING - EXATO PRIMEIRO, DEPOIS DECOMPOSIÇÃO ====================
@@ -1534,16 +1536,16 @@
                 doc.setDrawColor(0);
                 doc.line(14, 40, 196, 40);
                 
-                // Dados para a tabela
-                let tableData = [];
-                tableData.push(['Membro', 'Status Mês Atual', 'Total Quitado']);
+                // Criar dados com marcadores para coloring
+                let tableDataWithStyles = [];
+                tableDataWithStyles.push(['Membro', 'Status Mês Atual', 'Total Quitado']);
                 
                 let totalGeral = 0;
                 let quitadosMesCorrente = 0;
                 
                 members.forEach(m => {
                     const pago = payments[m] && payments[m][mesAtualIndex];
-                    const status = pago ? 'PAGO ✓' : 'PENDENTE';
+                    const status = pago ? 'PAGO' : 'PENDENTE';
                     
                     let totalMembro = 0;
                     if (payments[m]) {
@@ -1555,77 +1557,111 @@
                     if (pago) quitadosMesCorrente++;
                     totalGeral += totalMembro;
                     
-                    tableData.push([m, status, `${totalMembro} mês(es)`]);
+                    tableDataWithStyles.push([m, status, `${totalMembro} mês(es)`]);
                 });
                 
-                // Usar autoTable se disponível, senão usar método manual
-                if (doc.autoTable) {
-                    // Aplicar estilos condicionais às células de status
-                    const didParseCell = ({ cell, row }) => {
-                        if (row.section === 'body' && cell.column.index === 1) {
-                            const cellText = cell.text[0];
-                            if (cellText.includes('PAGO')) {
-                                cell.textColor = [46, 125, 50]; // Verde
-                                cell.fontStyle = 'bold';
-                            } else if (cellText.includes('PENDENTE')) {
-                                cell.textColor = [198, 40, 40]; // Vermelho
-                                cell.fontStyle = 'bold';
-                            }
-                        }
-                    };
+                // Desenhar tabela manualmente com controle total de cores
+                let yPos = 50;
+                const colX = [14, 100, 160];
+                const colWidths = [86, 60, 42];
+                const rowHeight = 8;
+                
+                // Cabeçalho
+                doc.setFillColor(7, 29, 73);
+                doc.setTextColor(255, 205, 5);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(9);
+                
+                // Desenhar fundo do cabeçalho
+                doc.rect(colX[0], yPos - 5, colX[1] + colWidths[1] + colWidths[0] - 14, rowHeight, 'F');
+                
+                // Textos do cabeçalho
+                doc.text('Membro', colX[0] + 2, yPos);
+                doc.text('Status Mês Atual', colX[1] + 2, yPos);
+                doc.text('Total Quitado', colX[2] + 2, yPos);
+                
+                yPos += rowHeight;
+                
+                // Linhas da tabela
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'normal');
+                
+                tableDataWithStyles.slice(1).forEach((row, idx) => {
+                    // Fundo alternado
+                    if (idx % 2 === 0) {
+                        doc.setFillColor(240, 240, 240);
+                    } else {
+                        doc.setFillColor(255, 255, 255);
+                    }
+                    doc.rect(colX[0], yPos - 5, colX[1] + colWidths[1] + colWidths[0] - 14, rowHeight, 'F');
                     
-                    doc.autoTable({
-                        startY: 45,
-                        head: [tableData[0]],
-                        body: tableData.slice(1),
-                        theme: 'grid',
-                        styles: { fontSize: 9, font: 'helvetica' },
-                        headStyles: { fillColor: [7, 29, 73], textColor: [255, 205, 5], fontStyle: 'bold' },
-                        alternateRowStyles: { fillColor: [240, 240, 240] },
-                        margin: { top: 45, left: 14, right: 14 },
-                        columnStyles: {
-                            1: { cellWidth: 50 } // Aumenta a largura da coluna de status
-                        },
-                        didParseCell: didParseCell
-                    });
+                    // Texto nome (preto normal)
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(row[0], colX[0] + 2, yPos);
                     
-                    const finalY = doc.lastAutoTable.finalY || 200;
-                    doc.setFontSize(11);
-                    doc.setFont(undefined, 'bold');
-                    doc.text(`RESUMO DO MÊS: ${nomeMesCorrente}`, 14, finalY + 10);
-                    doc.setFontSize(10);
-                    doc.setFont(undefined, 'normal');
-                    doc.text(`Total de Policiais: ${members.length}`, 14, finalY + 18);
-                    doc.text(`Adimplentes (${nomeMesCorrente}): ${quitadosMesCorrente}`, 14, finalY + 25);
-                    doc.text(`Arrecadação Total: R$ ${(totalGeral * 30).toFixed(2).replace('.', ',')}`, 14, finalY + 32);
-                    doc.text(`Taxa de Adimplência: ${members.length > 0 ? Math.round((quitadosMesCorrente / members.length) * 100) : 0}%`, 14, finalY + 39);
-                } else {
-                    // Fallback sem autoTable
-                    let yPos = 50;
-                    tableData.forEach((row, idx) => {
-                        if (idx === 0) {
-                            doc.setFont(undefined, 'bold');
-                            doc.setFillColor(7, 29, 73);
-                            doc.setTextColor(255, 205, 5);
-                        } else {
-                            doc.setFont(undefined, 'normal');
-                            doc.setTextColor(0, 0, 0);
-                            if (idx % 2 === 0) doc.setFillColor(240, 240, 240);
-                            else doc.setFillColor(255, 255, 255);
-                        }
-                        
-                        doc.rect(14, yPos - 5, 182, 6, idx === 0 ? 'F' : 'F');
-                        doc.text(row[0], 16, yPos);
-                        doc.text(row[1], 90, yPos);
-                        doc.text(row[2], 160, yPos);
-                        yPos += 7;
-                        
-                        if (yPos > 280) {
-                            doc.addPage();
-                            yPos = 20;
-                        }
-                    });
-                }
+                    // Texto Status (com cor e negrito)
+                    if (row[1] === 'PAGO') {
+                        doc.setTextColor(46, 125, 50); // Verde
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('PAGO', colX[1] + 2, yPos);
+                    } else if (row[1] === 'PENDENTE') {
+                        doc.setTextColor(198, 40, 40); // Vermelho
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('PENDENTE', colX[1] + 2, yPos);
+                    }
+                    
+                    // Texto Total (preto normal)
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(row[2], colX[2] + 2, yPos);
+                    
+                    yPos += rowHeight;
+                    
+                    // Paginação
+                    if (yPos > 280) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+                });
+                
+                // Desenhar bordas da tabela
+                doc.setDrawColor(0);
+                doc.setLineWidth(0.5);
+                yPos = 50;
+                const totalHeight = (tableDataWithStyles.length) * rowHeight;
+                
+                // Linhas verticais
+                doc.line(colX[0], 45, colX[0], yPos - 5 + totalHeight);
+                doc.line(colX[1], 45, colX[1], yPos - 5 + totalHeight);
+                doc.line(colX[2], 45, colX[2], yPos - 5 + totalHeight);
+                doc.line(colX[2] + colWidths[2], 45, colX[2] + colWidths[2], yPos - 5 + totalHeight);
+                
+                // Linhas horizontais
+                doc.line(colX[0], 45, colX[2] + colWidths[2], 45); // Topo
+                doc.line(colX[0], yPos - 5 + totalHeight, colX[2] + colWidths[2], yPos - 5 + totalHeight); // Fundo
+                
+                yPos = yPos - 5 + totalHeight + 10;
+                
+                // Resumo do mês
+                doc.setFontSize(11);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(0, 0, 0);
+                doc.text(`RESUMO DO MÊS: ${nomeMesCorrente}`, 14, yPos);
+                
+                yPos += 8;
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Total de Policiais: ${members.length}`, 14, yPos);
+                
+                yPos += 7;
+                doc.text(`Adimplentes (${nomeMesCorrente}): ${quitadosMesCorrente}`, 14, yPos);
+                
+                yPos += 7;
+                doc.text(`Arrecadação Total: R$ ${(totalGeral * 30).toFixed(2).replace('.', ',')}`, 14, yPos);
+                
+                yPos += 7;
+                doc.text(`Taxa de Adimplência: ${members.length > 0 ? Math.round((quitadosMesCorrente / members.length) * 100) : 0}%`, 14, yPos);
                 
                 doc.save(`mensalidades_${hoje.getFullYear()}-${String(mesAtualIndex + 1).padStart(2, '0')}.pdf`);
                 showSuccess('✅ PDF de mensalidades gerado com sucesso!');
