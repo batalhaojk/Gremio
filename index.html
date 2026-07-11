@@ -167,10 +167,10 @@
 
         <div class="tabs">
             <button class="tab-btn active" id="btn-tab-mensalidades" onclick="switchTab('mensalidades')">💳 Mensalidades</button>
-            <button class="tab-btn" id="btn-tab-consumo" onclick="switchTab('consumo')">🥤 Consumo da Sala</button>
+            <button class="tab-btn" id="btn-tab-consumo" onclick="switchTab('consumo')">🥤 Consumo de Bebidas</button>
             <button class="tab-btn" id="btn-tab-relatorio-estoque" onclick="switchTab('relatorio-estoque')">📦 Relatório de Estoque</button>
             <button class="tab-btn" id="btn-tab-controle-estoque" onclick="switchTab('controle-estoque')">📊 Controle de Estoque</button>
-            <button class="tab-btn" id="btn-tab-config" onclick="switchTab('config')">⚙️ Configurações</button>
+            <button class="tab-btn" id="btn-tab-config" onclick="switchTab('config')">⚙️ Associados</button>
         </div>
 
         <div class="success-message" id="globalSuccess"></div>
@@ -230,7 +230,7 @@
                 <input type="file" id="inputConsumoCSV" style="display:none;" accept=".csv">
             </div>
 
-            <h3>📋 Lançamentos de Consumo - Editar e Gerenciar</h3>
+            <h3>📋 Lançamentos de Consumo</h3>
             
             <div class="month-filter-section">
                 <label for="filterMesConsumo">Filtrar por Mês:</label>
@@ -242,14 +242,15 @@
             </div>
             
             <div class="section-box" style="margin-top: 20px;">
-                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Cada lançamento é listado individualmente. Clique em ✏️ para editar ou 🗑️ para deletar. Use o filtro acima para gerenciar por período.</p>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Visualize e edite todos os lançamentos de consumo. Clique em ✏️ para editar ou 🗑️ para deletar cada item.</p>
                 <div class="table-wrapper">
                     <table class="payment-table">
                         <thead>
                             <tr>
                                 <th>Data</th>
-                                <th>Membro</th>
-                                <th>Itens</th>
+                                <th>Membro / Policial</th>
+                                <th>Mês</th>
+                                <th>Itens Consumidos</th>
                                 <th>Valor</th>
                                 <th colspan="2">Ações</th>
                             </tr>
@@ -365,6 +366,7 @@
 
             <div class="section-box">
                 <h3>👥 Membros Cadastrados</h3>
+                <button class="btn btn-primary" onclick="openEditMembersModal()" style="margin-bottom: 15px;">✏️ Editar Membros</button>
                 <div id="configMembersList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px;"></div>
             </div>
 
@@ -472,6 +474,19 @@
                 <button class="btn btn-danger" onclick="removerConsumoEditando()">🗑️ Remover</button>
                 <button class="btn btn-success" onclick="salvarConsumoEditado()">💾 Salvar</button>
                 <button class="btn btn-secondary" onclick="closeEditarConsumoModal()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editMembersModal" class="modal">
+        <div class="modal-content" style="max-width: 700px; max-height: 80vh;">
+            <span class="close-modal" onclick="closeEditMembersModal()">&times;</span>
+            <h2>✏️ Editar Associados</h2>
+            <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Edite os nomes dos associados ou exclua-os do sistema.</p>
+            <div id="editMembersContent" style="max-height: 500px; overflow-y: auto; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: #fafafa;"></div>
+            <div class="btn-group" style="justify-content: flex-end;">
+                <button class="btn btn-success" onclick="salvarEdicaoMembros()">💾 Salvar Mudanças</button>
+                <button class="btn btn-secondary" onclick="closeEditMembersModal()">Cancelar</button>
             </div>
         </div>
     </div>
@@ -1578,31 +1593,6 @@
             if(pList) pList.innerHTML = PRODUTOS.map(p => `<div class="product-item"><div style="color:#555; font-size:11px; line-height:1.2;">${p.nome}</div><div style="color:#071D49; font-size:16px; font-weight:bold; margin-top:5px;">R$ ${p.valor.toFixed(2).replace('.', ',')}</div></div>`).join('');
         }
 
-        function renderConsumoSalaTable() {
-            const tbody = document.getElementById('bodyConsumo'); if(!tbody) return; tbody.innerHTML = '';
-            if (consumoSala.length === 0) { 
-                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#999;">Nenhum consumo localizado no banco.</td></tr>`; 
-                return; 
-            }
-            const consumoFiltrado = consumoSala.filter(c => {
-                if (!filtroMesConsumo) return true;
-                return c.mes === MONTHS[parseInt(filtroMesConsumo)];
-            });
-            
-            if (consumoFiltrado.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#999;">Nenhum consumo encontrado para este mês.</td></tr>`;
-                return;
-            }
-            
-            consumoFiltrado.forEach(c => {
-                tbody.innerHTML += `<tr>
-                    <td><strong>${c.membro}</strong></td>
-                    <td>${c.mes}</td>
-                    <td><span style="font-size:12px; color:#555;">${c.item} (${c.data})</span></td>
-                    <td><span class="status-badge status-paid">R$ ${c.valor.toFixed(2).replace('.', ',')}</span></td>
-                </tr>`;
-            });
-        }
 
         function renderEditarConsumoTable() {
             const tbody = document.getElementById('bodyEditarConsumo'); 
@@ -1614,14 +1604,14 @@
                 return; 
             }
 
-            // Aplicar filtro por mês se definido
+            // Aplicar filtro de mês
             let consumoFiltrado = consumoSala;
             if (filtroMesConsumo) {
                 consumoFiltrado = consumoSala.filter(c => c.mes === MONTHS[parseInt(filtroMesConsumo)]);
             }
 
             if (consumoFiltrado.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#999;">Nenhum consumo encontrado para o período selecionado.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#999;">Nenhum consumo encontrado para este mês.</td></tr>`;
                 return;
             }
 
@@ -1645,6 +1635,7 @@
                 tbody.innerHTML += `<tr>
                     <td style="font-weight:bold;">${consumo.data}</td>
                     <td><strong>${consumo.membro}</strong></td>
+                    <td>${consumo.mes}</td>
                     <td>${consumo.item}</td>
                     <td>R$ ${consumo.valor.toFixed(2).replace('.', ',')}</td>
                     <td><button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="abrirEditarConsumoModal(${realIdx})">✏️ Editar</button></td>
@@ -1654,7 +1645,7 @@
             
             // Total geral
             tbody.innerHTML += `<tr style="background:#d4edda; font-weight:bold; font-size:14px;">
-                <td colspan="4" style="text-align:right;">TOTAL GERAL:</td>
+                <td colspan="5" style="text-align:right;">TOTAL GERAL:</td>
                 <td colspan="2">R$ ${totalGeral.toFixed(2).replace('.', ',')}</td>
             </tr>`;
         }
@@ -1819,7 +1810,6 @@
                 consumoSala.splice(idx, 1);
                 saveStorage();
                 renderEditarConsumoTable();
-                
                 renderEstoque();
                 showSuccess('✅ Lançamento deletado com sucesso!');
             }
@@ -1948,7 +1938,6 @@
                 console.log('✅ Dados salvos!');
                 
                 renderEditarConsumoTable();
-                
                 renderEstoque();
                 closeEditarLancamentoModal();
                 showSuccess(`✅ Lançamento atualizado com sucesso! Total: R$ ${valorFinal.toFixed(2).replace('.', ',')}`);
@@ -2099,7 +2088,6 @@
             const deletados = quantidadeAntes - quantidadeDepois;
             
             saveStorage();
-            
             renderEditarConsumoTable();
             renderRelatorioEstoque();
             renderEstoqueAtual();
@@ -2253,7 +2241,7 @@
             // Relatório por dia - CONSOLIDADO
             const tbodyDia = document.getElementById('bodyRelatorioDia'); if(!tbodyDia) return; tbodyDia.innerHTML = '';
             
-            // Agrupar por data e bebida (consolidado) - RESPEITANDO VALOR REAL DO CONSUMO
+            // Agrupar por data e bebida (consolidado)
             const consumoPorDia = {};
             consumoSala.forEach(c => {
                 // Aplicar filtro de mês
@@ -2265,16 +2253,6 @@
                 
                 // Parse itens - suporta "Nome x3" ou "Nome"
                 const itens = c.item.split(' + ').map(i => i.trim());
-                
-                // Calcular quantidade total de itens para distribuir valor proporcionalmente
-                let qtdTotalItens = 0;
-                itens.forEach(itemStr => {
-                    const qtdMatch = itemStr.match(/^(.+?)\s+x(\d+)$/);
-                    const quantidade = qtdMatch ? parseInt(qtdMatch[2]) : 1;
-                    qtdTotalItens += quantidade;
-                });
-                
-                // Distribuir valor proporcionalmente entre itens
                 itens.forEach(itemStr => {
                     const qtdMatch = itemStr.match(/^(.+?)\s+x(\d+)$/);
                     let nomeItem, quantidade;
@@ -2289,14 +2267,10 @@
                     
                     const produto = PRODUTOS.find(p => p.nome.toUpperCase() === nomeItem.toUpperCase());
                     if (produto) {
-                        // Valor proporcional: (valor_total * quantidade_deste_item) / total_itens
-                        const valorProporcional = (c.valor * quantidade) / qtdTotalItens;
-                        
                         if (!consumoPorDia[c.data][nomeItem]) {
-                            consumoPorDia[c.data][nomeItem] = { qtd: 0, valorTotal: 0 };
+                            consumoPorDia[c.data][nomeItem] = { qtd: 0, valor: produto.valor };
                         }
                         consumoPorDia[c.data][nomeItem].qtd += quantidade;
-                        consumoPorDia[c.data][nomeItem].valorTotal += valorProporcional;
                     }
                 });
             });
@@ -2312,8 +2286,7 @@
                     
                     nomesOrdenados.forEach((nomeItem, idx) => {
                         const item = itensDodia[nomeItem];
-                        const totalItem = item.valorTotal.toFixed(2);
-                        const valorUnitario = (item.valorTotal / item.qtd).toFixed(2);
+                        const totalItem = (item.qtd * item.valor).toFixed(2);
                         
                         // Só mostra data na primeira linha do dia
                         const dataCell = idx === 0 ? `<td style="font-weight:bold; background:#f0f0f0;">${data}</td>` : `<td style="background:#f0f0f0;"></td>`;
@@ -2322,7 +2295,7 @@
                             ${dataCell}
                             <td><strong>${nomeItem}</strong></td>
                             <td style="text-align:center;"><span style="background:#e3f2fd; padding:4px 8px; border-radius:4px; font-weight:bold;">${item.qtd}x</span></td>
-                            <td>R$ ${valorUnitario.replace('.', ',')}</td>
+                            <td>R$ ${item.valor.toFixed(2).replace('.', ',')}</td>
                             <td style="font-weight:bold;">R$ ${totalItem.replace('.', ',')}</td>
                         </tr>`;
                     });
@@ -2330,7 +2303,7 @@
                     // Subtotal do dia
                     let subtotalDia = 0;
                     Object.keys(itensDodia).forEach(nomeItem => {
-                        subtotalDia += itensDodia[nomeItem].valorTotal;
+                        subtotalDia += itensDodia[nomeItem].qtd * itensDodia[nomeItem].valor;
                     });
                     tbodyDia.innerHTML += `<tr style="background:#fff3cd; font-weight:bold;">
                         <td colspan="3" style="text-align:right;">Subtotal ${data}:</td>
@@ -2343,7 +2316,7 @@
                 let totalGeral = 0;
                 diasOrdenados.forEach(data => {
                     Object.keys(consumoPorDia[data]).forEach(nomeItem => {
-                        totalGeral += consumoPorDia[data][nomeItem].valorTotal;
+                        totalGeral += consumoPorDia[data][nomeItem].qtd * consumoPorDia[data][nomeItem].valor;
                     });
                 });
                 tbodyDia.innerHTML += `<tr style="background:#d4edda; font-weight:bold; font-size:14px;">
@@ -2366,39 +2339,14 @@
                 }
                 
                 const itens = c.item.split(' + ').map(i => i.trim());
-                
-                // Calcular quantidade total para distribuição proporcional do valor
-                let qtdTotalItens = 0;
-                itens.forEach(itemStr => {
-                    const qtdMatch = itemStr.match(/^(.+?)\s+x(\d+)$/);
-                    const quantidade = qtdMatch ? parseInt(qtdMatch[2]) : 1;
-                    qtdTotalItens += quantidade;
-                });
-                
-                // Distribuir valor proporcionalmente
-                itens.forEach(itemStr => {
-                    const qtdMatch = itemStr.match(/^(.+?)\s+x(\d+)$/);
-                    let nomeItem, quantidade;
-                    
-                    if (qtdMatch) {
-                        nomeItem = qtdMatch[1];
-                        quantidade = parseInt(qtdMatch[2]);
-                    } else {
-                        nomeItem = itemStr;
-                        quantidade = 1;
-                    }
-                    
+                itens.forEach(nomeItem => {
                     const produto = PRODUTOS.find(p => p.nome.toUpperCase() === nomeItem.toUpperCase());
                     if (produto) {
-                        // Valor proporcional baseado no valor real do consumo
-                        const valorProporcional = (c.valor * quantidade) / qtdTotalItens;
-                        
                         if (!consumoPorBebida[nomeItem]) {
-                            consumoPorBebida[nomeItem] = { qtd: 0, valorTotal: 0 };
+                            consumoPorBebida[nomeItem] = { qtd: 0, valor: produto.valor };
                         }
-                        consumoPorBebida[nomeItem].qtd += quantidade;
-                        consumoPorBebida[nomeItem].valorTotal += valorProporcional;
-                        valorTotal += valorProporcional;
+                        consumoPorBebida[nomeItem].qtd += 1;
+                        valorTotal += produto.valor;
                     }
                 });
             });
@@ -2408,7 +2356,7 @@
             } else {
                 Object.keys(consumoPorBebida).sort().forEach(nomeItem => {
                     const item = consumoPorBebida[nomeItem];
-                    const totalItem = item.valorTotal;
+                    const totalItem = (item.qtd * item.valor);
                     const percentual = valorTotal > 0 ? ((totalItem / valorTotal) * 100).toFixed(1) : 0;
                     tbodyBebida.innerHTML += `<tr>
                         <td><strong>${nomeItem}</strong></td>
@@ -2680,6 +2628,186 @@
             }
         }
 
+        function exportarConsumoPDF() {
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+                
+                const hoje = new Date();
+                const mesAtualIndex = hoje.getMonth();
+                const mesNome = filtroMesConsumo ? MONTHS[parseInt(filtroMesConsumo)] : 'Todos os Meses';
+                
+                // ========== DEFINIÇÃO DE COLUNAS COM MARGENS - OTIMIZADO ==========
+                const COL1_START = 14;      // Início coluna 1 (Membro)
+                const COL1_WIDTH = 50;      // ← AUMENTADO de 35 para 50mm (nomes mais confortáveis)
+                const COL1_END = COL1_START + COL1_WIDTH;
+                
+                const MARGIN_ENTRE = 0.5;   // ← REDUZIDO de 1 para 0.5mm (margem mais compacta)
+                
+                const COL2_START = COL1_END + MARGIN_ENTRE;  // Início coluna 2 (Itens)
+                const COL2_WIDTH = 107;     // ← REDUZIDO de 118 para 107mm (proporcional ao aumento de COL1)
+                const COL2_END = COL2_START + COL2_WIDTH;
+                
+                const COL3_START = COL2_END + MARGIN_ENTRE;  // Início coluna 3 (Valor)
+                const COL3_WIDTH = 28;      // ← REDUZIDO de 30 para 28mm
+                
+                const pageHeight = doc.internal.pageSize.height;
+                const pageWidth = doc.internal.pageSize.width;
+                const margin = 14;
+                let yPos = 0;
+                
+                // Função para desenhar cabeçalho
+                function desenharCabecalho() {
+                    doc.setFontSize(11);  // ← Reduzido de 13 para 11 (consistente)
+                    doc.setFont(undefined, 'bold');
+                    doc.text('RELATÓRIO DE CONSUMO DE BEBIDAS', margin, 14);
+                    
+                    doc.setFontSize(8);   // ← Reduzido de 9 para 8 (consistente)
+                    doc.setFont(undefined, 'normal');
+                    doc.text(`Período: ${mesNome} | Data: ${hoje.toLocaleDateString('pt-BR')}`, margin, 20);
+                    doc.text(`Grêmio Policial - 3º BPM - Consumo da Sala`, margin, 25);
+                    
+                    // Separador
+                    doc.setDrawColor(0);
+                    doc.line(margin, 27, pageWidth - margin, 27);
+                    
+                    // ← NOVO: Resetar fonte após cabeçalho
+                    doc.setFontSize(7.5);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(0, 0, 0);
+                    
+                    return 31; // yPos inicial após cabeçalho
+                }
+                
+                // Desenhar cabeçalho inicial
+                yPos = desenharCabecalho();
+                
+                // Filtrar consumos por mês se necessário
+                let consumoFiltrado = consumoSala;
+                if (filtroMesConsumo) {
+                    consumoFiltrado = consumoSala.filter(c => c.mes === MONTHS[parseInt(filtroMesConsumo)]);
+                }
+                
+                if (consumoFiltrado.length === 0) {
+                    doc.setFontSize(10);
+                    doc.text('Nenhum consumo registrado para o período selecionado.', margin, yPos + 10);
+                } else {
+                    // Consolidação por membro - FILTRAR DADOS CORROMPIDOS
+                    const consumoPorMembro = {};
+                    let valorTotal = 0;
+                    
+                    consumoFiltrado.forEach(c => {
+                        // ← NOVO: Filtrar itens corrompidos (com caracteres estranhos)
+                        if (c.item && !c.item.includes('&') && !c.item.includes('þ') && !c.item.includes('VALOR NÃO IDENTIFICADO')) {
+                            if (!consumoPorMembro[c.membro]) {
+                                consumoPorMembro[c.membro] = { itens: [], valor: 0 };
+                            }
+                            consumoPorMembro[c.membro].itens.push(c.item);
+                            consumoPorMembro[c.membro].valor += c.valor;
+                            valorTotal += c.valor;
+                        }
+                    });
+                    
+                    const membros = Object.keys(consumoPorMembro).sort();
+                    
+                    // Desenhar cabeçalho da tabela
+                    doc.setFontSize(8);
+                    doc.setFont(undefined, 'bold');
+                    doc.setFillColor(7, 29, 73);
+                    doc.setTextColor(255, 205, 5);
+                    
+                    // Fundo do cabeçalho
+                    doc.rect(COL1_START, yPos - 3.5, COL1_WIDTH + MARGIN_ENTRE + COL2_WIDTH + MARGIN_ENTRE + COL3_WIDTH, 5.5, 'F');
+                    
+                    // Linhas de separação entre colunas do cabeçalho
+                    doc.setDrawColor(150, 150, 150);
+                    doc.line(COL2_START - MARGIN_ENTRE, yPos - 3.5, COL2_START - MARGIN_ENTRE, yPos + 2);
+                    doc.line(COL3_START - MARGIN_ENTRE, yPos - 3.5, COL3_START - MARGIN_ENTRE, yPos + 2);
+                    
+                    // Texto do cabeçalho
+                    doc.text('Membro / Policial', COL1_START + 0.5, yPos);
+                    doc.text('Itens Consumidos', COL2_START + 0.5, yPos);
+                    doc.text('Valor Total', COL3_START + 0.5, yPos);
+                    
+                    yPos += 8;
+                    
+                    // Linhas de dados - fonte já está setada em desenharCabecalho
+                    doc.setTextColor(0, 0, 0);
+                    
+                    membros.forEach((membro, idx) => {
+                        const dados = consumoPorMembro[membro];
+                        
+                        // ← NOVO: Contar itens repetidos
+                        const contadores = {};
+                        dados.itens.forEach(item => {
+                            contadores[item] = (contadores[item] || 0) + 1;
+                        });
+                        
+                        // ← NOVO: Formatar itens com contagem
+                        const itemsFormatados = Object.entries(contadores).map(([item, count]) => {
+                            return count > 1 ? `${item} (x${count})` : item;
+                        });
+                        
+                        const itemsText = itemsFormatados.join(', ');
+                        doc.setFont(undefined, 'normal');
+                        
+                        // Quebrar items em múltiplas linhas - RESPEITANDO MARGEM
+                        const textLines = doc.splitTextToSize(itemsText, COL2_WIDTH - 1);
+                        const alturaLinha = Math.max(5.5, textLines.length * 3.8) + 1;
+                        
+                        // Verificar se precisa criar nova página
+                        if (yPos + alturaLinha > pageHeight - 18) {
+                            doc.addPage();
+                            yPos = desenharCabecalho();
+                        }
+                        
+                        // Fundo alternado
+                        if (idx % 2 === 0) {
+                            doc.setFillColor(245, 245, 245);
+                            doc.rect(COL1_START, yPos - 3.5, COL1_WIDTH + MARGIN_ENTRE + COL2_WIDTH + MARGIN_ENTRE + COL3_WIDTH, alturaLinha, 'F');
+                        }
+                        
+                        // Linhas de grade
+                        doc.setDrawColor(230, 230, 230);
+                        doc.line(COL2_START - MARGIN_ENTRE, yPos - 3.5, COL2_START - MARGIN_ENTRE, yPos + alturaLinha - 3.5);
+                        doc.line(COL3_START - MARGIN_ENTRE, yPos - 3.5, COL3_START - MARGIN_ENTRE, yPos + alturaLinha - 3.5);
+                        
+                        // Coluna 1: Nome do membro
+                        doc.setFont(undefined, 'bold');
+                        const membroLines = doc.splitTextToSize(membro, COL1_WIDTH - 1);
+                        doc.text(membroLines, COL1_START + 0.5, yPos);
+                        doc.setFont(undefined, 'normal');
+                        
+                        // Coluna 2: Itens consumidos
+                        doc.text(textLines, COL2_START + 0.5, yPos);
+                        
+                        // Coluna 3: Valor total
+                        const valorText = `R$ ${dados.valor.toFixed(2).replace('.', ',')}`;
+                        doc.text(valorText, COL3_START + COL3_WIDTH - 0.5, yPos, { align: 'right' });
+                        
+                        yPos += alturaLinha + 0.5;
+                    });
+                    
+                    // TOTAL GERAL
+                    if (yPos + 8 > pageHeight - 15) {
+                        doc.addPage();
+                        yPos = desenharCabecalho() + 5;
+                    }
+                    
+                    yPos += 2;
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`TOTAL GERAL: R$ ${valorTotal.toFixed(2).replace('.', ',')}`, COL1_START, yPos + 5);
+                }
+                
+                doc.save(`consumo_bebidas_${hoje.getFullYear()}-${String(mesAtualIndex + 1).padStart(2, '0')}.pdf`);
+                showSuccess('✅ PDF de consumo gerado com sucesso! Páginas: ' + doc.internal.pages.length);
+            } catch (err) {
+                showError('❌ Erro ao gerar PDF: ' + err.message);
+                console.error(err);
+            }
+        }
+
         function exportarEstoquePDF() {
             try {
                 const { jsPDF } = window.jspdf;
@@ -2703,97 +2831,77 @@
                 doc.setDrawColor(0);
                 doc.line(14, 31, 270, 31);
                 
-                // Consolidação por bebida - RESPEITANDO VALOR REAL
+                // Consolidação por bebida
                 const consumoPorBebida = {};
                 let valorTotal = 0;
                 
-                consumoSala.forEach(c => {
-                    if (filtroMesEstoque && c.mes !== MONTHS[parseInt(filtroMesEstoque)]) {
-                        return;
-                    }
-                    const itens = c.item.split(' + ').map(i => i.trim());
-                    
-                    // Calcular quantidade total para distribuição proporcional
-                    let qtdTotalItens = 0;
-                    itens.forEach(itemStr => {
-                        const qtdMatch = itemStr.match(/^(.+?)\s+x(\d+)$/);
-                        const quantidade = qtdMatch ? parseInt(qtdMatch[2]) : 1;
-                        qtdTotalItens += quantidade;
-                    });
-                    
-                    // Distribuir valor proporcionalmente
-                    itens.forEach(itemStr => {
-                        const qtdMatch = itemStr.match(/^(.+?)\s+x(\d+)$/);
-                        let nomeItem, quantidade;
-                        
-                        if (qtdMatch) {
-                            nomeItem = qtdMatch[1];
-                            quantidade = parseInt(qtdMatch[2]);
-                        } else {
-                            nomeItem = itemStr;
-                            quantidade = 1;
-                        }
-                        
-                        const produto = PRODUTOS.find(p => p.nome.toUpperCase() === nomeItem.toUpperCase());
-                        if (produto) {
-                            // Valor proporcional baseado no valor real do consumo
-                            const valorProporcional = (c.valor * quantidade) / qtdTotalItens;
-                            
-                            if (!consumoPorBebida[nomeItem]) {
-                                consumoPorBebida[nomeItem] = { qtd: 0, valorTotal: 0 };
-                            }
-                            consumoPorBebida[nomeItem].qtd += quantidade;
-                            consumoPorBebida[nomeItem].valorTotal += valorProporcional;
-                            valorTotal += valorProporcional;
-                        }
-                    });
-                });
-                
-                if (Object.keys(consumoPorBebida).length === 0) {
+                // Verificar se há dados
+                if (!consumoSala || consumoSala.length === 0) {
                     doc.setFontSize(11);
                     doc.text('Nenhum consumo registrado para o período selecionado.', 14, 40);
                 } else {
-                    // Tabela de bebidas
-                    let tableData = [];
-                    tableData.push(['Bebida', 'Quantidade', 'Valor Unitário', 'Total', '% do Total']);
-                    
-                    Object.keys(consumoPorBebida).sort().forEach(nomeItem => {
-                        const item = consumoPorBebida[nomeItem];
-                        const totalItem = item.valorTotal;
-                        const valorUnitario = item.valorTotal / item.qtd;
-                        const percentual = valorTotal > 0 ? ((totalItem / valorTotal) * 100).toFixed(1) : 0;
-                        
-                        tableData.push([
-                            nomeItem,
-                            `${item.qtd}x`,
-                            `R$ ${valorUnitario.toFixed(2).replace('.', ',')}`,
-                            `R$ ${totalItem.toFixed(2).replace('.', ',')}`,
-                            `${percentual}%`
-                        ]);
-                    });
-                    
-                    if (doc.autoTable) {
-                        doc.autoTable({
-                            startY: 36,
-                            head: [tableData[0]],
-                            body: tableData.slice(1),
-                            theme: 'grid',
-                            styles: { fontSize: 9, font: 'helvetica' },
-                            headStyles: { fillColor: [7, 29, 73], textColor: [255, 205, 5], fontStyle: 'bold' },
-                            alternateRowStyles: { fillColor: [240, 240, 240] },
-                            margin: { left: 14, right: 14 },
-                            columnStyles: {
-                                1: { halign: 'center' },
-                                2: { halign: 'right' },
-                                3: { halign: 'right' },
-                                4: { halign: 'center' }
+                    consumoSala.forEach(c => {
+                        if (filtroMesEstoque && c.mes !== MONTHS[parseInt(filtroMesEstoque)]) {
+                            return;
+                        }
+                        const itens = c.item.split(' + ').map(i => i.trim());
+                        itens.forEach(nomeItem => {
+                            const produto = PRODUTOS.find(p => p.nome.toUpperCase() === nomeItem.toUpperCase());
+                            if (produto) {
+                                if (!consumoPorBebida[nomeItem]) {
+                                    consumoPorBebida[nomeItem] = { qtd: 0, valor: produto.valor };
+                                }
+                                consumoPorBebida[nomeItem].qtd += 1;
+                                valorTotal += produto.valor;
                             }
                         });
-                        
-                        const finalY = doc.lastAutoTable.finalY || 100;
+                    });
+                    
+                    if (Object.keys(consumoPorBebida).length === 0) {
                         doc.setFontSize(11);
-                        doc.setFont(undefined, 'bold');
-                        doc.text(`TOTAL GERAL: R$ ${valorTotal.toFixed(2).replace('.', ',')}`, 14, finalY + 8);
+                        doc.text('Nenhum consumo registrado para o período selecionado.', 14, 40);
+                    } else {
+                        // Tabela de bebidas
+                        let tableData = [];
+                        tableData.push(['Bebida', 'Quantidade', 'Valor Unitário', 'Total', '% do Total']);
+                        
+                        Object.keys(consumoPorBebida).sort().forEach(nomeItem => {
+                            const item = consumoPorBebida[nomeItem];
+                            const totalItem = item.qtd * item.valor;
+                            const percentual = valorTotal > 0 ? ((totalItem / valorTotal) * 100).toFixed(1) : 0;
+                            
+                            tableData.push([
+                                nomeItem,
+                                `${item.qtd}x`,
+                                `R$ ${item.valor.toFixed(2).replace('.', ',')}`,
+                                `R$ ${totalItem.toFixed(2).replace('.', ',')}`,
+                                `${percentual}%`
+                            ]);
+                        });
+                        
+                        if (doc.autoTable) {
+                            doc.autoTable({
+                                startY: 36,
+                                head: [tableData[0]],
+                                body: tableData.slice(1),
+                                theme: 'grid',
+                                styles: { fontSize: 9, font: 'helvetica' },
+                                headStyles: { fillColor: [7, 29, 73], textColor: [255, 205, 5], fontStyle: 'bold' },
+                                alternateRowStyles: { fillColor: [240, 240, 240] },
+                                margin: { left: 14, right: 14 },
+                                columnStyles: {
+                                    1: { halign: 'center' },
+                                    2: { halign: 'right' },
+                                    3: { halign: 'right' },
+                                    4: { halign: 'center' }
+                                }
+                            });
+                            
+                            const finalY = doc.lastAutoTable.finalY || 100;
+                            doc.setFontSize(11);
+                            doc.setFont(undefined, 'bold');
+                            doc.text(`TOTAL GERAL: R$ ${valorTotal.toFixed(2).replace('.', ',')}`, 14, finalY + 8);
+                        }
                     }
                 }
                 
@@ -2808,11 +2916,69 @@
         function showSuccess(m) { const el = document.getElementById('globalSuccess'); if(el) { el.textContent = m; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000); } }
         function showError(m) { const el = document.getElementById('globalError'); if(el) { el.textContent = m; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000); } }
         
+        // ================== EDITAR MEMBROS ==================
+        function openEditMembersModal() {
+            const modal = document.getElementById('editMembersModal');
+            const content = document.getElementById('editMembersContent');
+            content.innerHTML = '';
+            
+            if (members.length === 0) {
+                content.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Nenhum associado cadastrado.</p>';
+                modal.style.display = 'block';
+                return;
+            }
+            
+            let html = '';
+            members.forEach((member, index) => {
+                html += `
+                    <div style="display: flex; gap: 10px; margin-bottom: 12px; padding: 10px; background: white; border-radius: 6px; border: 1px solid #ddd; align-items: center;">
+                        <input type="text" id="memberEdit_${index}" value="${member.name}" placeholder="Nome do associado" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+                        <button type="button" class="btn btn-danger" style="padding: 8px 12px; font-size: 12px; white-space: nowrap;" onclick="deleteMemberFromEdit(${index})">🗑️ Excluir</button>
+                    </div>
+                `;
+            });
+            
+            content.innerHTML = html;
+            modal.style.display = 'block';
+        }
+        
+        function closeEditMembersModal() {
+            document.getElementById('editMembersModal').style.display = 'none';
+        }
+        
+        function deleteMemberFromEdit(index) {
+            if (confirm(`Tem certeza que deseja excluir "${members[index].name}"?`)) {
+                members.splice(index, 1);
+                saveToFirebase();
+                openEditMembersModal(); // Recarregar a lista
+                renderConfigTab();
+                showSuccess('✅ Associado excluído com sucesso!');
+            }
+        }
+        
+        function salvarEdicaoMembros() {
+            members.forEach((member, index) => {
+                const input = document.getElementById(`memberEdit_${index}`);
+                if (input) {
+                    const novoNome = input.value.trim();
+                    if (novoNome) {
+                        member.name = novoNome;
+                    }
+                }
+            });
+            
+            saveToFirebase();
+            renderConfigTab();
+            closeEditMembersModal();
+            showSuccess('✅ Associados atualizados com sucesso!');
+        }
+        
         window.onclick = function(e) { 
             if (e.target == document.getElementById('editProductsModal')) closeEditProductsModal(); 
             if (e.target == document.getElementById('whatsappModal')) document.getElementById('whatsappModal').style.display = 'none';
             if (e.target == document.getElementById('editarConsumoModal')) closeEditarConsumoModal();
             if (e.target == document.getElementById('editarLancamentoModal')) closeEditarLancamentoModal();
+            if (e.target == document.getElementById('editMembersModal')) closeEditMembersModal();
         }
         window.addEventListener('load', init);
     </script>
