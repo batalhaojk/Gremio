@@ -57,6 +57,9 @@
         .modal-content { background-color: white; margin: 5% auto; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); max-height: 85vh; overflow-y: auto; }
         .close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
 
+        /* ==================== QUANTIDADE NO CONSUMO ==================== */
+        .item-qtd-input { width: 50px !important; padding: 4px !important; text-align: center; font-size: 12px !important; margin-left: auto; }
+
         /* ==================== STATUS FIREBASE ==================== */
         .firebase-status { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .firebase-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -165,7 +168,6 @@
         <div class="tabs">
             <button class="tab-btn active" id="btn-tab-mensalidades" onclick="switchTab('mensalidades')">💳 Mensalidades</button>
             <button class="tab-btn" id="btn-tab-consumo" onclick="switchTab('consumo')">🥤 Consumo da Sala</button>
-            <button class="tab-btn" id="btn-tab-editar-consumo" onclick="switchTab('editar-consumo')">✏️ Editar Consumos</button>
             <button class="tab-btn" id="btn-tab-relatorio-estoque" onclick="switchTab('relatorio-estoque')">📦 Relatório de Estoque</button>
             <button class="tab-btn" id="btn-tab-controle-estoque" onclick="switchTab('controle-estoque')">📊 Controle de Estoque</button>
             <button class="tab-btn" id="btn-tab-config" onclick="switchTab('config')">⚙️ Configurações</button>
@@ -228,7 +230,7 @@
                 <input type="file" id="inputConsumoCSV" style="display:none;" accept=".csv">
             </div>
 
-            <h3>📋 Relatório Consolidado de Consumo</h3>
+            <h3>📋 Lançamentos de Consumo - Editar e Gerenciar</h3>
             
             <div class="month-filter-section">
                 <label for="filterMesConsumo">Filtrar por Mês:</label>
@@ -239,34 +241,17 @@
                 <button class="btn btn-danger" onclick="limparConsumoMes()" style="background: #dc3545;">🗑️ Limpar Mês</button>
             </div>
             
-            <div class="table-wrapper">
-                <table class="payment-table">
-                    <thead>
-                        <tr>
-                            <th>Membro / Policial</th>
-                            <th>Mês</th>
-                            <th>Itens Consumidos</th>
-                            <th>Total Pago</th>
-                        </tr>
-                    </thead>
-                    <tbody id="bodyConsumo"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="tab-content" id="editar-consumo">
-            <div class="section-box">
-                <h3>✏️ Editar Consumos Identificados</h3>
-                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Clique em um consumo para corrigir os itens identificados ou remover.</p>
+            <div class="section-box" style="margin-top: 20px;">
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Cada lançamento é listado individualmente. Clique em ✏️ para editar ou 🗑️ para deletar. Use o filtro acima para gerenciar por período.</p>
                 <div class="table-wrapper">
                     <table class="payment-table">
                         <thead>
                             <tr>
                                 <th>Data</th>
                                 <th>Membro</th>
-                                <th>Itens Identificados</th>
+                                <th>Itens</th>
                                 <th>Valor</th>
-                                <th>Ações</th>
+                                <th colspan="2">Ações</th>
                             </tr>
                         </thead>
                         <tbody id="bodyEditarConsumo"></tbody>
@@ -274,6 +259,8 @@
                 </div>
             </div>
         </div>
+
+
 
         <div class="tab-content" id="relatorio-estoque">
             <div class="month-filter-section">
@@ -419,6 +406,41 @@
         </div>
     </div>
 
+    <div id="editarLancamentoModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close-modal" onclick="closeEditarLancamentoModal()">&times;</span>
+            <h2>✏️ Editar Lançamento</h2>
+            <div style="margin-top: 20px;">
+                <input type="hidden" id="editConsumoIdx" value="">
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Data</label>
+                    <input type="date" id="editConsumoData" style="width: 100%;">
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Membro</label>
+                    <input type="text" id="editConsumoMembro" placeholder="Nome do membro" style="width: 100%;">
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">📦 Itens Consumidos</label>
+                    <div id="editLancamentoItens" style="max-height: 280px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 8px; background: #fafafa;"></div>
+                    <small style="color: #999; display: block; margin-top: 5px;">✅ Marque os itens consumidos e defina a quantidade</small>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">💰 Valor Total (Editável)</label>
+                    <input type="text" id="editLancamentoValorTotal" placeholder="Ex: R$ 10,50" style="border: 2px solid #FFCD05; font-size: 16px; font-weight: bold;">
+                </div>
+            </div>
+            <div class="btn-group" style="margin-top: 20px; justify-content: flex-end;">
+                <button class="btn btn-success" onclick="salvarEdicaoLancamento()">💾 Salvar</button>
+                <button class="btn btn-secondary" onclick="closeEditarLancamentoModal()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="editarConsumoModal" class="modal">
         <div class="modal-content" style="max-width: 500px;">
             <span class="close-modal" onclick="closeEditarConsumoModal()">&times;</span>
@@ -433,8 +455,8 @@
                     <input type="text" id="edEditarDataConsumo" readonly style="background: #f5f5f5; cursor: not-allowed;">
                 </div>
                 <div style="margin-bottom: 15px;">
-                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Valor Total</label>
-                    <input type="text" id="edEditarValorConsumo" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">💰 Valor Total (EDITÁVEL)</label>
+                    <input type="text" id="edEditarValorConsumo" placeholder="Ex: R$ 10,50" style="border: 2px solid #FFCD05;">
                 </div>
                 <div style="margin-bottom: 15px;">
                     <label style="display: block; font-weight: bold; margin-bottom: 5px;">Itens Consumidos</label>
@@ -645,30 +667,46 @@
 
         async function syncToFirebase() {
             if (!firebaseReady) return;
-            try {
-                await firebaseDB.ref('gremio').set({members, payments, consumoSala});
-                console.log('✅ Sincronizado');
-            } catch(e) {
-                console.warn('⚠️ Erro sync:', e);
+            let tentativas = 3;
+            while (tentativas > 0) {
+                try {
+                    await firebaseDB.ref('gremio').set({members, payments, consumoSala});
+                    console.log('✅ Sincronizado com Firebase');
+                    return true;
+                } catch(e) {
+                    tentativas--;
+                    console.warn(`⚠️ Erro sync (tentativa ${4-tentativas}/3):`, e.message);
+                    if (tentativas > 0) {
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                }
             }
+            console.warn('⚠️ Firebase offline - dados salvos localmente apenas');
         }
 
         async function loadFromFirebaseInit() {
             if (!firebaseReady) return false;
             try {
-                const snap = await firebaseDB.ref('gremio').once('value');
+                // Timeout de 5 segundos para não ficar travado
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout Firebase')), 5000)
+                );
+                const snap = await Promise.race([
+                    firebaseDB.ref('gremio').once('value'),
+                    timeoutPromise
+                ]);
                 if (snap.exists()) {
                     const data = snap.val();
                     members = data.members || [];
                     payments = data.payments || {};
                     consumoSala = data.consumoSala || [];
                     if (members.length > 0) {
-                        console.log('✅ Carregado Firebase');
+                        console.log('✅ Dados carregados do Firebase');
                         return true;
                     }
                 }
             } catch(e) {
-                console.warn('⚠️ Erro carregar:', e);
+                console.warn('⚠️ Firebase indisponível, usando localStorage:', e.message);
             }
             return false;
         }
@@ -719,8 +757,14 @@
         }
 
         function saveStorage() {
-            try { localStorage.setItem('gremio_v3_data', JSON.stringify({ members, payments, consumoSala, PRODUTOS, estoqueInicial, estoqueMovimentacoes })); } catch(e) {}
-            syncToFirebase();
+            try { 
+                localStorage.setItem('gremio_v3_data', JSON.stringify({ members, payments, consumoSala, PRODUTOS, estoqueInicial, estoqueMovimentacoes })); 
+                console.log('✅ localStorage salvo');
+            } catch(e) {
+                console.warn('⚠️ Erro ao salvar localStorage:', e);
+            }
+            // Sincronizar com Firebase (não aguardar para não bloquear)
+            syncToFirebase().catch(e => console.warn('⚠️ Erro ao sincronizar Firebase:', e));
         }
 
         function limparBancoForçado() {
@@ -1232,46 +1276,120 @@
                 });
             });
             
-            // Adicionar consumos
+            // Adicionar consumos - SUPORTANDO QUANTIDADE
             consumoSala.forEach(consumo => {
                 const itens = consumo.item.split(' + ').map(i => i.trim());
                 const dataConsumo = new Date(consumo.data).getTime();
                 
-                itens.forEach(item => {
+                itens.forEach(itemStr => {
+                    // Parse quantidade
+                    const match = itemStr.match(/^(.+?)\s+x(\d+)$/);
+                    const nomeProduto = match ? match[1].trim() : itemStr.trim();
+                    const quantidade = match ? parseInt(match[2]) : 1;
+                    
                     todasMovimentacoes.push({
                         dataHora: dataConsumo,
                         dataHoraFormatada: consumo.data,
-                        produto: item,
+                        produto: nomeProduto,
                         tipo: 'SAÍDA',
-                        quantidade: 1
+                        quantidade: quantidade
                     });
                 });
             });
             
-            // Ordenar por data (mais recente primeiro)
-            todasMovimentacoes.sort((a, b) => b.dataHora - a.dataHora);
-            
-            // Renderizar
-            todasMovimentacoes.forEach(mov => {
-                const saldoAposMov = calcularEstoqueAtual(mov.produto);
-                const tipoClass = mov.tipo === 'ENTRADA' ? 'status-paid' : 'status-unpaid';
-                const tipoIcon = mov.tipo === 'ENTRADA' ? '➕' : '➖';
-                
-                tbody.innerHTML += `<tr>
-                    <td style="font-size: 12px;">${mov.dataHoraFormatada}</td>
-                    <td><strong>${mov.produto}</strong></td>
-                    <td><span class="status-badge ${tipoClass}">${tipoIcon} ${mov.tipo}</span></td>
-                    <td style="text-align: center;">${mov.quantidade}</td>
-                    <td style="font-weight: 600; color: #071D49;">${saldoAposMov} unid.</td>
-                    <td>
-                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="removerMovimentacaoEstoque('${mov.dataHora}', '${mov.produto}', '${mov.tipo}')">🗑️</button>
-                    </td>
-                </tr>`;
-            });
-            
             if (todasMovimentacoes.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">Nenhuma movimentação registrada.</td></tr>';
+                return;
             }
+            
+            // ===== CONSOLIDAÇÃO POR DATA E PRODUTO =====
+            const porData = {};
+            todasMovimentacoes.forEach(mov => {
+                const chaveData = mov.dataHoraFormatada;
+                if (!porData[chaveData]) {
+                    porData[chaveData] = {};
+                }
+                
+                const chaveProduto = mov.produto.toUpperCase();
+                if (!porData[chaveData][chaveProduto]) {
+                    porData[chaveData][chaveProduto] = {
+                        nome: mov.produto,
+                        entradas: 0,
+                        saidas: 0
+                    };
+                }
+                
+                if (mov.tipo === 'ENTRADA') {
+                    porData[chaveData][chaveProduto].entradas += mov.quantidade;
+                } else {
+                    porData[chaveData][chaveProduto].saidas += mov.quantidade;
+                }
+            });
+            
+            // ===== RENDERIZAR CONSOLIDADO =====
+            const datasOrdenadas = Object.keys(porData).sort((a, b) => new Date(b) - new Date(a));
+            
+            datasOrdenadas.forEach(data => {
+                const produtosDodia = porData[data];
+                const chavesOrdenadas = Object.keys(produtosDodia).sort();
+                let primeiraLinhaData = true;
+                
+                chavesOrdenadas.forEach(chave => {
+                    const mov = produtosDodia[chave];
+                    const saldoAposMov = calcularEstoqueAtual(mov.nome);
+                    
+                    // Determinar tipo (entrada ou saída)
+                    let tipoDisplay, tipoClass, tipoIcon;
+                    if (mov.entradas > 0 && mov.saidas === 0) {
+                        tipoDisplay = 'ENTRADA';
+                        tipoClass = 'status-paid';
+                        tipoIcon = '➕';
+                    } else if (mov.saidas > 0 && mov.entradas === 0) {
+                        tipoDisplay = 'SAÍDA';
+                        tipoClass = 'status-unpaid';
+                        tipoIcon = '➖';
+                    } else {
+                        tipoDisplay = 'ENTRADA/SAÍDA';
+                        tipoClass = 'status-unpaid';
+                        tipoIcon = '⚙️';
+                    }
+                    
+                    // Quantidade a exibir
+                    const quantidade = mov.entradas > 0 ? mov.entradas : mov.saidas;
+                    
+                    const dataCell = primeiraLinhaData 
+                        ? `<td style="font-weight:bold; background:#f0f0f0;">${data}</td>` 
+                        : `<td style="background:#f0f0f0;"></td>`;
+                    
+                    tbody.innerHTML += `<tr>
+                        ${dataCell}
+                        <td><strong>${mov.nome}</strong></td>
+                        <td><span class="status-badge ${tipoClass}">${tipoIcon} ${tipoDisplay}</span></td>
+                        <td style="text-align: center; font-weight: bold;">${quantidade}</td>
+                        <td style="font-weight: 600; color: #071D49;">${saldoAposMov} unid.</td>
+                        <td>
+                            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="removerMovimentacaoEstoque('${data}', '${mov.nome.replace(/'/g, "\\'")}', '${tipoDisplay}')">🗑️</button>
+                        </td>
+                    </tr>`;
+                    
+                    primeiraLinhaData = false;
+                });
+                
+                // Subtotal do dia
+                let subtotalEntrada = 0, subtotalSaida = 0;
+                Object.keys(produtosDodia).forEach(chave => {
+                    subtotalEntrada += produtosDodia[chave].entradas;
+                    subtotalSaida += produtosDodia[chave].saidas;
+                });
+                
+                tbody.innerHTML += `<tr style="background:#fff3cd; font-weight:bold;">
+                    <td colspan="2" style="text-align:right;">Subtotal ${data}:</td>
+                    <td></td>
+                    <td></td>
+                    <td>E: ${subtotalEntrada} / S: ${subtotalSaida}</td>
+                    <td></td>
+                </tr>`;
+            });
         }
 
         function removerMovimentacaoEstoque(dataHora, produto, tipo) {
@@ -1334,7 +1452,7 @@
         function renderAll() {
             try {
                 renderMensalidadesTableHeader(); renderMensalidadesTableBody(); renderStatsMensalidades();
-                renderProdutosPrecos(); renderConsumoSalaTable(); renderEditarConsumoTable(); renderRelatorioEstoque(); renderConfigMembersList();
+                renderProdutosPrecos(); renderEditarConsumoTable(); renderRelatorioEstoque(); renderConfigMembersList();
                 renderEstoqueAtual(); renderHistoricoEstoque(); popularProdutosEstoque();
             } catch(e) { console.error(e); }
         }
@@ -1372,7 +1490,7 @@
 
         function aplicarFiltroConsumo() {
             filtroMesConsumo = document.getElementById('filterMesConsumo').value;
-            renderConsumoSalaTable();
+            renderEditarConsumoTable();
         }
 
         function aplicarFiltroEstoque() {
@@ -1487,20 +1605,447 @@
         }
 
         function renderEditarConsumoTable() {
-            const tbody = document.getElementById('bodyEditarConsumo'); if(!tbody) return; tbody.innerHTML = '';
+            const tbody = document.getElementById('bodyEditarConsumo'); 
+            if(!tbody) return; 
+            tbody.innerHTML = '';
+            
             if (consumoSala.length === 0) { 
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#999;">Nenhum consumo registrado.</td></tr>`; 
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#999;">Nenhum consumo registrado.</td></tr>`; 
                 return; 
             }
-            consumoSala.forEach((c, idx) => {
+
+            // Aplicar filtro por mês se definido
+            let consumoFiltrado = consumoSala;
+            if (filtroMesConsumo) {
+                consumoFiltrado = consumoSala.filter(c => c.mes === MONTHS[parseInt(filtroMesConsumo)]);
+            }
+
+            if (consumoFiltrado.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#999;">Nenhum consumo encontrado para o período selecionado.</td></tr>`;
+                return;
+            }
+
+            // Ordenar consumos por data
+            const consumoOrdenado = [...consumoFiltrado].sort((a, b) => new Date(a.data) - new Date(b.data));
+            
+            // Renderizar cada lançamento como uma linha individual
+            let totalGeral = 0;
+            consumoOrdenado.forEach((consumo) => {
+                // IMPORTANTE: Encontrar o índice real no array original consumoSala
+                const realIdx = consumoSala.findIndex(c => 
+                    c.data === consumo.data && 
+                    c.membro === consumo.membro && 
+                    c.item === consumo.item && 
+                    c.valor === consumo.valor
+                );
+                
+                const subtotal = consumo.valor.toFixed(2);
+                totalGeral += consumo.valor;
+                
                 tbody.innerHTML += `<tr>
-                    <td>${c.data}</td>
-                    <td><strong>${c.membro}</strong></td>
-                    <td><span style="font-size:12px; color:#555;">${c.item}</span></td>
-                    <td>R$ ${c.valor.toFixed(2).replace('.', ',')}</td>
-                    <td><button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="abrirEditarConsumoModal(${idx})">✏️ Editar</button></td>
+                    <td style="font-weight:bold;">${consumo.data}</td>
+                    <td><strong>${consumo.membro}</strong></td>
+                    <td>${consumo.item}</td>
+                    <td>R$ ${consumo.valor.toFixed(2).replace('.', ',')}</td>
+                    <td><button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="abrirEditarConsumoModal(${realIdx})">✏️ Editar</button></td>
+                    <td><button class="btn btn-danger" style="padding:4px 8px; font-size:11px;" onclick="deletarLancamento(${realIdx})">🗑️ Deletar</button></td>
                 </tr>`;
             });
+            
+            // Total geral
+            tbody.innerHTML += `<tr style="background:#d4edda; font-weight:bold; font-size:14px;">
+                <td colspan="4" style="text-align:right;">TOTAL GERAL:</td>
+                <td colspan="2">R$ ${totalGeral.toFixed(2).replace('.', ',')}</td>
+            </tr>`;
+        }
+
+        // Função para editar um lançamento individual
+        function editarLancamento(idx) {
+            console.log('📝 Editando lançamento índice:', idx);
+            
+            const consumo = consumoSala[idx];
+            if (!consumo) {
+                showError('❌ Lançamento não encontrado!');
+                return;
+            }
+            
+            const modal = document.getElementById('editarLancamentoModal');
+            if (!modal) {
+                showError('❌ Modal não encontrado!');
+                return;
+            }
+            
+            // Carregar campos básicos
+            document.getElementById('editConsumoData').value = consumo.data;
+            document.getElementById('editConsumoMembro').value = consumo.membro;
+            document.getElementById('editConsumoIdx').value = idx;
+            
+            console.log('Consumo:', consumo);
+            
+            // Parse dos itens atuais do consumo
+            const itensAtuais = {};
+            const itens = consumo.item.split(' + ').map(i => i.trim());
+            console.log('Itens do consumo:', itens);
+            
+            itens.forEach(itemStr => {
+                const match = itemStr.match(/^(.+?)\s+x(\d+)$/);
+                const nomeProduto = match ? match[1].trim() : itemStr.trim();
+                const quantidade = match ? parseInt(match[2]) : 1;
+                itensAtuais[nomeProduto.toUpperCase()] = { nome: nomeProduto, qtd: quantidade };
+            });
+            
+            console.log('Itens atuais parseados:', itensAtuais);
+            
+            // Renderizar lista de produtos com checkboxes e quantidade
+            const container = document.getElementById('editLancamentoItens');
+            container.innerHTML = '';
+            
+            PRODUTOS.forEach(produto => {
+                const chave = produto.nome.toUpperCase();
+                const itemAtual = itensAtuais[chave];
+                const isChecked = itemAtual ? 'checked' : '';
+                const qtdAtual = itemAtual ? itemAtual.qtd : 1;
+                
+                const label = document.createElement('label');
+                label.style.display = 'flex';
+                label.style.alignItems = 'center';
+                label.style.gap = '8px';
+                label.style.padding = '8px';
+                label.style.borderBottom = '1px solid #e0e0e0';
+                label.style.cursor = 'pointer';
+                label.style.transition = 'background 0.2s';
+                
+                label.onmouseover = () => label.style.background = '#f5f5f5';
+                label.onmouseout = () => label.style.background = 'transparent';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = produto.nome; // IMPORTANTE: Nome sem escape!
+                checkbox.checked = itemAtual ? true : false;
+                checkbox.style.width = '16px';
+                checkbox.style.height = '16px';
+                checkbox.style.flexShrink = '0';
+                checkbox.style.cursor = 'pointer';
+                checkbox.addEventListener('change', atualizarValorTotalEdicao);
+                
+                const nomeSpan = document.createElement('span');
+                nomeSpan.textContent = produto.nome;
+                nomeSpan.style.flex = '1';
+                nomeSpan.style.fontSize = '13px';
+                
+                const precoSpan = document.createElement('span');
+                precoSpan.textContent = `R$ ${produto.valor.toFixed(2).replace('.', ',')}`;
+                precoSpan.style.color = '#999';
+                precoSpan.style.fontSize = '12px';
+                precoSpan.style.minWidth = '70px';
+                precoSpan.style.textAlign = 'right';
+                
+                const qtdInput = document.createElement('input');
+                qtdInput.type = 'number';
+                qtdInput.className = 'item-qtd-input'; // Adicionar classe para encontrar depois!
+                qtdInput.min = '1';
+                qtdInput.max = '99';
+                qtdInput.value = qtdAtual;
+                qtdInput.style.width = '50px';
+                qtdInput.style.padding = '4px';
+                qtdInput.style.textAlign = 'center';
+                qtdInput.style.fontSize = '12px';
+                qtdInput.style.border = '1px solid #ddd';
+                qtdInput.style.borderRadius = '4px';
+                qtdInput.addEventListener('change', atualizarValorTotalEdicao);
+                qtdInput.addEventListener('input', atualizarValorTotalEdicao);
+                
+                label.appendChild(checkbox);
+                label.appendChild(nomeSpan);
+                label.appendChild(precoSpan);
+                label.appendChild(qtdInput);
+                
+                container.appendChild(label);
+            });
+            
+            console.log('✅ Lista de produtos renderizada');
+            
+            // Calcular valor inicial
+            atualizarValorTotalEdicao();
+            
+            modal.style.display = 'block';
+        }
+
+        // Função para atualizar valor total na edição
+        function atualizarValorTotalEdicao() {
+            console.log('💰 Atualizando valor total...');
+            
+            const container = document.getElementById('editLancamentoItens');
+            if (!container) {
+                console.warn('⚠️ Container não encontrado');
+                return;
+            }
+            
+            const checkboxes = container.querySelectorAll('input[type=checkbox]:checked');
+            console.log('Checkboxes marcados:', checkboxes.length);
+            
+            let valorTotal = 0;
+            
+            checkboxes.forEach((checkbox, i) => {
+                const label = checkbox.closest('label');
+                const qtdInput = label.querySelector('input[type="number"]');
+                const qtd = parseInt(qtdInput.value) || 1;
+                
+                const nomeProduto = checkbox.value;
+                console.log(`Item ${i+1}: ${nomeProduto} x${qtd}`);
+                
+                const produto = PRODUTOS.find(p => p.nome === nomeProduto);
+                if (produto) {
+                    const itemTotal = produto.valor * qtd;
+                    valorTotal += itemTotal;
+                    console.log(`  → R$ ${produto.valor.toFixed(2)} × ${qtd} = R$ ${itemTotal.toFixed(2)}`);
+                } else {
+                    console.warn(`⚠️ Produto não encontrado: ${nomeProduto}`);
+                }
+            });
+            
+            console.log('💰 Valor total calculado:', valorTotal.toFixed(2));
+            
+            // Atualizar campo de input do valor (agora é editável)
+            const totalElement = document.getElementById('editLancamentoValorTotal');
+            if (totalElement) {
+                totalElement.value = `R$ ${valorTotal.toFixed(2).replace('.', ',')}`;
+            }
+        }
+
+        // Função para deletar um lançamento individual
+        function deletarLancamento(idx) {
+            if (confirm('Tem certeza que deseja deletar este lançamento?')) {
+                consumoSala.splice(idx, 1);
+                saveStorage();
+                renderEditarConsumoTable();
+                
+                renderEstoque();
+                showSuccess('✅ Lançamento deletado com sucesso!');
+            }
+        }
+
+        // Função para salvar edições de um lançamento
+        function salvarEdicaoLancamento() {
+            console.log('🔍 Iniciando salvarEdicaoLancamento...');
+            
+            const idx = parseInt(document.getElementById('editConsumoIdx').value);
+            const data = document.getElementById('editConsumoData').value;
+            const membro = document.getElementById('editConsumoMembro').value;
+            
+            console.log('Índice:', idx, 'Data:', data, 'Membro:', membro);
+            
+            if (isNaN(idx) || idx < 0 || idx >= consumoSala.length) {
+                showError('❌ Erro: Índice inválido!');
+                console.error('Índice inválido:', idx);
+                return;
+            }
+            
+            if (!data || !membro) {
+                showError('❌ Preencha data e membro!');
+                return;
+            }
+            
+            // Coletar itens selecionados
+            const container = document.getElementById('editLancamentoItens');
+            if (!container) {
+                showError('❌ Erro: Container de itens não encontrado!');
+                return;
+            }
+            
+            const checkboxes = container.querySelectorAll('input[type=checkbox]:checked');
+            console.log('Itens selecionados:', checkboxes.length);
+            
+            if (checkboxes.length === 0) {
+                showError('❌ Selecione pelo menos um item!');
+                return;
+            }
+            
+            // Consolidar itens com quantidades
+            const itensConsolidados = [];
+            let valorTotal = 0;
+            let valido = true;
+            
+            checkboxes.forEach(checkbox => {
+                const label = checkbox.closest('label');
+                if (!label) {
+                    console.warn('⚠️ Label não encontrada para checkbox');
+                    return;
+                }
+                
+                // Procurar pelo input de número de diferentes formas
+                let qtdInput = label.querySelector('.item-qtd-input');
+                if (!qtdInput) {
+                    qtdInput = label.querySelector('input[type="number"]');
+                }
+                
+                if (!qtdInput) {
+                    console.warn('⚠️ qtdInput não encontrado na label');
+                    return;
+                }
+                
+                const qtd = parseInt(qtdInput.value) || 1;
+                console.log('Produto:', checkbox.value, 'Quantidade:', qtd);
+                
+                if (qtd < 1) {
+                    showError('❌ Todas as quantidades devem ser >= 1!');
+                    valido = false;
+                    return;
+                }
+                
+                const nomeProduto = checkbox.value;
+                const produto = PRODUTOS.find(p => p.nome === nomeProduto);
+                if (produto) {
+                    // Formato: "Produto" ou "Produto x2"
+                    const itemFormatado = qtd > 1 ? `${nomeProduto} x${qtd}` : nomeProduto;
+                    itensConsolidados.push(itemFormatado);
+                    valorTotal += produto.valor * qtd;
+                } else {
+                    console.warn('⚠️ Produto não encontrado:', nomeProduto);
+                }
+            });
+            
+            if (!valido) return;
+            
+            if (itensConsolidados.length === 0) {
+                showError('❌ Nenhum item válido foi selecionado!');
+                return;
+            }
+            
+            console.log('Itens consolidados:', itensConsolidados);
+            console.log('Valor total calculado:', valorTotal);
+            
+            // ⭐ NOVO: Capturar valor do campo editável
+            let valorFinal = valorTotal;
+            const valorInputField = document.getElementById('editLancamentoValorTotal').value.trim();
+            if (valorInputField) {
+                const valorLimpo = valorInputField.replace(/R\$\s*/, '').replace(',', '.');
+                const valorNum = parseFloat(valorLimpo);
+                
+                if (!isNaN(valorNum) && valorNum > 0) {
+                    valorFinal = valorNum;
+                    console.log('Usando valor editado:', valorFinal);
+                } else {
+                    showError('❌ Valor inválido! Use formato: R$ 10,50 ou 10.50');
+                    return;
+                }
+            }
+            
+            // Atualizar consumo
+            try {
+                consumoSala[idx].data = data;
+                consumoSala[idx].membro = membro;
+                consumoSala[idx].item = itensConsolidados.join(' + ');
+                consumoSala[idx].valor = parseFloat(valorFinal.toFixed(2));
+                
+                // Atualizar mês se necessário
+                const dataObj = new Date(data);
+                consumoSala[idx].mes = MONTHS[dataObj.getMonth()];
+                
+                console.log('Consumo atualizado:', consumoSala[idx]);
+                
+                saveStorage();
+                console.log('✅ Dados salvos!');
+                
+                renderEditarConsumoTable();
+                
+                renderEstoque();
+                closeEditarLancamentoModal();
+                showSuccess(`✅ Lançamento atualizado com sucesso! Total: R$ ${valorFinal.toFixed(2).replace('.', ',')}`);
+            } catch(e) {
+                console.error('❌ Erro ao salvar:', e);
+                showError('❌ Erro ao salvar lançamento: ' + e.message);
+            }
+        }
+
+        // Nova função para editar quantidade consolidada
+        function editarConsolidado(data, nomeProduto, qtdAtual) {
+            const novaQtd = prompt(`Editar quantidade de "${nomeProduto}":\n\nQuantidade atual: ${qtdAtual}\n\nDigite a nova quantidade:`, qtdAtual);
+            
+            if (novaQtd === null) return; // Cancelou
+            
+            const qtdNova = parseInt(novaQtd);
+            if (isNaN(qtdNova) || qtdNova < 1) {
+                showError('❌ Quantidade inválida!');
+                return;
+            }
+            
+            if (qtdNova === qtdAtual) {
+                showError('⚠️ Quantidade não mudou!');
+                return;
+            }
+            
+            // Encontra todos os consumos dessa data e produto
+            const consumosEncontrados = [];
+            consumoSala.forEach((c, idx) => {
+                if (c.data === data) {
+                    const itens = c.item.split(' + ').map(i => i.trim());
+                    itens.forEach(itemStr => {
+                        const itemLimpo = itemStr.split(' x')[0].trim();
+                        if (itemLimpo === nomeProduto) {
+                            consumosEncontrados.push(idx);
+                        }
+                    });
+                }
+            });
+            
+            if (consumosEncontrados.length === 0) {
+                showError('❌ Nenhum consumo encontrado!');
+                return;
+            }
+            
+            // Atualiza a quantidade
+            if (consumosEncontrados.length === 1) {
+                // Se há só um consumo, atualiza direto
+                const idx = consumosEncontrados[0];
+                const produtoObj = PRODUTOS.find(p => p.nome.toUpperCase() === nomeProduto.toUpperCase());
+                consumoSala[idx].valor = qtdNova * (produtoObj ? produtoObj.valor : 1);
+                consumoSala[idx].item = qtdNova > 1 ? `${nomeProduto} x${qtdNova}` : nomeProduto;
+            } else {
+                // Se há múltiplos membros, distribui a quantidade proporcionalmente
+                const consumoAnterior = consumosEncontrados.reduce((sum, idx) => {
+                    const itens = consumoSala[idx].item.split(' + ');
+                    const qtdItem = itens.reduce((q, item) => {
+                        const itemLimpo = item.split(' x')[0].trim();
+                        if (itemLimpo === nomeProduto) {
+                            const qtdMatch = item.match(/ x(\d+)$/);
+                            return q + (qtdMatch ? parseInt(qtdMatch[1]) : 1);
+                        }
+                        return q;
+                    }, 0);
+                    return sum + qtdItem;
+                }, 0);
+                
+                // Ajusta proporcionalmente
+                let qtdRestante = qtdNova;
+                consumosEncontrados.forEach((idx, i) => {
+                    let qtdEsteConsumo = Math.round(qtdNova / consumosEncontrados.length);
+                    if (i === consumosEncontrados.length - 1) {
+                        qtdEsteConsumo = qtdRestante; // Última: pega o que restou
+                    }
+                    qtdRestante -= qtdEsteConsumo;
+                    
+                    const produtoObj = PRODUTOS.find(p => p.nome.toUpperCase() === nomeProduto.toUpperCase());
+                    const novoValor = qtdEsteConsumo * (produtoObj ? produtoObj.valor : 1);
+                    
+                    // Substitui o item no consumo
+                    let itens = consumoSala[idx].item.split(' + ').map(i => i.trim());
+                    itens = itens.map(item => {
+                        const itemLimpo = item.split(' x')[0].trim();
+                        if (itemLimpo === nomeProduto) {
+                            return qtdEsteConsumo > 1 ? `${nomeProduto} x${qtdEsteConsumo}` : nomeProduto;
+                        }
+                        return item;
+                    });
+                    
+                    consumoSala[idx].item = itens.join(' + ');
+                    consumoSala[idx].valor = novoValor;
+                });
+            }
+            
+            saveStorage();
+            renderEditarConsumoTable();
+            showSuccess(`✅ Quantidade de "${nomeProduto}" alterada para ${qtdNova}x em ${data}!`);
         }
 
         function limparConsumoMes() {
@@ -1554,7 +2099,7 @@
             const deletados = quantidadeAntes - quantidadeDepois;
             
             saveStorage();
-            renderConsumoSalaTable();
+            
             renderEditarConsumoTable();
             renderRelatorioEstoque();
             renderEstoqueAtual();
@@ -1585,21 +2130,38 @@
             // Une os produtos cadastrados com quaisquer itens já usados neste registro
             // que não estejam mais na lista de produtos (itens legados/personalizados)
             const nomesProdutos = PRODUTOS.map(p => p.nome);
-            const extras = itensSelecionados.filter(item =>
-                !nomesProdutos.some(nome => nome.toUpperCase() === item.toUpperCase())
-            );
+            const extras = itensSelecionados.filter(item => {
+                const nomeLimpo = item.split(' x')[0].trim();
+                return !nomesProdutos.some(nome => nome.toUpperCase() === nomeLimpo.toUpperCase());
+            });
             const todosItens = [...nomesProdutos, ...extras];
 
             container.innerHTML = todosItens.map(nome => {
-                const checked = itensSelecionados.some(item => item.toUpperCase() === nome.toUpperCase());
-                const produto = PRODUTOS.find(p => p.nome.toUpperCase() === nome.toUpperCase());
+                const nomeLimpo = nome.split(' x')[0].trim();
+                let quantidade = 1;
+                let checked = false;
+
+                // Verifica se este item estava selecionado (com ou sem quantidade)
+                itensSelecionados.forEach(item => {
+                    const itemLimpo = item.split(' x')[0].trim();
+                    if (itemLimpo.toUpperCase() === nomeLimpo.toUpperCase()) {
+                        checked = true;
+                        const qtdMatch = item.match(/ x(\d+)$/);
+                        if (qtdMatch) {
+                            quantidade = parseInt(qtdMatch[1]);
+                        }
+                    }
+                });
+
+                const produto = PRODUTOS.find(p => p.nome.toUpperCase() === nomeLimpo.toUpperCase());
                 const tag = produto
                     ? ` <span style="color:#999; font-weight:normal;">(R$ ${produto.valor.toFixed(2).replace('.', ',')})</span>`
                     : ' <span style="color:#999; font-weight:normal;">(item personalizado)</span>';
-                const nomeEscapado = nome.replace(/"/g, '&quot;');
+                const nomeEscapado = nomeLimpo.replace(/"/g, '&quot;');
                 return `<label style="display:flex; align-items:center; gap:8px; padding:7px 4px; border-bottom:1px solid #eee; cursor:pointer; font-size:13px; font-weight:600;">
                     <input type="checkbox" value="${nomeEscapado}" ${checked ? 'checked' : ''} style="width:16px; height:16px; flex-shrink:0;">
-                    <span>${nome}${tag}</span>
+                    <span>${nomeLimpo}${tag}</span>
+                    <input type="number" min="1" max="99" value="${quantidade}" class="item-qtd-input" title="Quantidade">
                 </label>`;
             }).join('');
         }
@@ -1620,6 +2182,7 @@
             container.insertAdjacentHTML('beforeend', `<label style="display:flex; align-items:center; gap:8px; padding:7px 4px; border-bottom:1px solid #eee; cursor:pointer; font-size:13px; font-weight:600;">
                 <input type="checkbox" value="${nomeEscapado}" checked style="width:16px; height:16px; flex-shrink:0;">
                 <span>${nome} <span style="color:#999; font-weight:normal;">(item personalizado)</span></span>
+                <input type="number" min="1" max="99" value="1" class="item-qtd-input" title="Quantidade">
             </label>`);
             input.value = '';
         }
@@ -1628,24 +2191,60 @@
             document.getElementById('editarConsumoModal').style.display = 'none'; 
             consumoEditandoIdx = null;
         }
+
+        function closeEditarLancamentoModal() { 
+            document.getElementById('editarLancamentoModal').style.display = 'none'; 
+        }
         
         function salvarConsumoEditado() {
             if (consumoEditandoIdx === null) return;
             const container = document.getElementById('edEditarItensConsumoLista');
-            const selecionados = Array.from(container.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
-            if (selecionados.length === 0) { showError("❌ Selecione pelo menos um item."); return; }
+            const checkboxes = container.querySelectorAll('input[type=checkbox]:checked');
+            if (checkboxes.length === 0) { showError("❌ Selecione pelo menos um item."); return; }
             
-            const novoItem = selecionados.join(' + ');
+            const itensComQuantidade = [];
+            checkboxes.forEach((checkbox) => {
+                const nomeLimpo = checkbox.value;
+                const label = checkbox.closest('label');
+                const qtdInput = label.querySelector('.item-qtd-input');
+                const qtd = qtdInput ? parseInt(qtdInput.value) || 1 : 1;
+                
+                if (qtd > 1) {
+                    itensComQuantidade.push(`${nomeLimpo} x${qtd}`);
+                } else {
+                    itensComQuantidade.push(nomeLimpo);
+                }
+            });
+
+            const novoItem = itensComQuantidade.join(' + ');
+            
+            // ⭐ NOVO: Capturar valor editado
+            let novoValor = consumoSala[consumoEditandoIdx].valor;
+            const valorInput = document.getElementById('edEditarValorConsumo').value.trim();
+            
+            if (valorInput) {
+                const valorLimpo = valorInput.replace(/R\$\s*/, '').replace(',', '.');
+                const valorNum = parseFloat(valorLimpo);
+                
+                if (!isNaN(valorNum) && valorNum > 0) {
+                    novoValor = valorNum;
+                } else {
+                    showError('❌ Valor inválido! Use formato: R$ 10,50 ou 10.50');
+                    return;
+                }
+            }
+            
             consumoSala[consumoEditandoIdx].item = novoItem;
-            saveStorage(); renderEditarConsumoTable(); closeEditarConsumoModal();
-            showSuccess('✅ Consumo atualizado!');
+            consumoSala[consumoEditandoIdx].valor = novoValor;
+            saveStorage(); renderEditarConsumoTable(); renderRelatorioEstoque(); closeEditarConsumoModal();
+            showSuccess(`✅ Consumo atualizado! Items: ${novoItem} | Valor: R$ ${novoValor.toFixed(2).replace('.', ',')}`);
         }
         
         function removerConsumoEditando() {
             if (consumoEditandoIdx === null) return;
             if (confirm('Remover este consumo?')) {
                 consumoSala.splice(consumoEditandoIdx, 1);
-                saveStorage(); renderEditarConsumoTable(); closeEditarConsumoModal();
+                saveStorage(); renderEditarConsumoTable(); renderRelatorioEstoque(); closeEditarConsumoModal();
                 showSuccess('✅ Consumo removido!');
             }
         }
@@ -1654,7 +2253,7 @@
             // Relatório por dia - CONSOLIDADO
             const tbodyDia = document.getElementById('bodyRelatorioDia'); if(!tbodyDia) return; tbodyDia.innerHTML = '';
             
-            // Agrupar por data e bebida (consolidado)
+            // Agrupar por data e bebida (consolidado) - RESPEITANDO VALOR REAL DO CONSUMO
             const consumoPorDia = {};
             consumoSala.forEach(c => {
                 // Aplicar filtro de mês
@@ -1664,15 +2263,40 @@
                 
                 if (!consumoPorDia[c.data]) consumoPorDia[c.data] = {};
                 
-                // Parse itens
+                // Parse itens - suporta "Nome x3" ou "Nome"
                 const itens = c.item.split(' + ').map(i => i.trim());
-                itens.forEach(nomeItem => {
+                
+                // Calcular quantidade total de itens para distribuir valor proporcionalmente
+                let qtdTotalItens = 0;
+                itens.forEach(itemStr => {
+                    const qtdMatch = itemStr.match(/^(.+?)\s+x(\d+)$/);
+                    const quantidade = qtdMatch ? parseInt(qtdMatch[2]) : 1;
+                    qtdTotalItens += quantidade;
+                });
+                
+                // Distribuir valor proporcionalmente entre itens
+                itens.forEach(itemStr => {
+                    const qtdMatch = itemStr.match(/^(.+?)\s+x(\d+)$/);
+                    let nomeItem, quantidade;
+                    
+                    if (qtdMatch) {
+                        nomeItem = qtdMatch[1];
+                        quantidade = parseInt(qtdMatch[2]);
+                    } else {
+                        nomeItem = itemStr;
+                        quantidade = 1;
+                    }
+                    
                     const produto = PRODUTOS.find(p => p.nome.toUpperCase() === nomeItem.toUpperCase());
                     if (produto) {
+                        // Valor proporcional: (valor_total * quantidade_deste_item) / total_itens
+                        const valorProporcional = (c.valor * quantidade) / qtdTotalItens;
+                        
                         if (!consumoPorDia[c.data][nomeItem]) {
-                            consumoPorDia[c.data][nomeItem] = { qtd: 0, valor: produto.valor };
+                            consumoPorDia[c.data][nomeItem] = { qtd: 0, valorTotal: 0 };
                         }
-                        consumoPorDia[c.data][nomeItem].qtd += 1;
+                        consumoPorDia[c.data][nomeItem].qtd += quantidade;
+                        consumoPorDia[c.data][nomeItem].valorTotal += valorProporcional;
                     }
                 });
             });
@@ -1688,7 +2312,8 @@
                     
                     nomesOrdenados.forEach((nomeItem, idx) => {
                         const item = itensDodia[nomeItem];
-                        const totalItem = (item.qtd * item.valor).toFixed(2);
+                        const totalItem = item.valorTotal.toFixed(2);
+                        const valorUnitario = (item.valorTotal / item.qtd).toFixed(2);
                         
                         // Só mostra data na primeira linha do dia
                         const dataCell = idx === 0 ? `<td style="font-weight:bold; background:#f0f0f0;">${data}</td>` : `<td style="background:#f0f0f0;"></td>`;
@@ -1697,7 +2322,7 @@
                             ${dataCell}
                             <td><strong>${nomeItem}</strong></td>
                             <td style="text-align:center;"><span style="background:#e3f2fd; padding:4px 8px; border-radius:4px; font-weight:bold;">${item.qtd}x</span></td>
-                            <td>R$ ${item.valor.toFixed(2).replace('.', ',')}</td>
+                            <td>R$ ${valorUnitario.replace('.', ',')}</td>
                             <td style="font-weight:bold;">R$ ${totalItem.replace('.', ',')}</td>
                         </tr>`;
                     });
@@ -1705,7 +2330,7 @@
                     // Subtotal do dia
                     let subtotalDia = 0;
                     Object.keys(itensDodia).forEach(nomeItem => {
-                        subtotalDia += itensDodia[nomeItem].qtd * itensDodia[nomeItem].valor;
+                        subtotalDia += itensDodia[nomeItem].valorTotal;
                     });
                     tbodyDia.innerHTML += `<tr style="background:#fff3cd; font-weight:bold;">
                         <td colspan="3" style="text-align:right;">Subtotal ${data}:</td>
@@ -1718,7 +2343,7 @@
                 let totalGeral = 0;
                 diasOrdenados.forEach(data => {
                     Object.keys(consumoPorDia[data]).forEach(nomeItem => {
-                        totalGeral += consumoPorDia[data][nomeItem].qtd * consumoPorDia[data][nomeItem].valor;
+                        totalGeral += consumoPorDia[data][nomeItem].valorTotal;
                     });
                 });
                 tbodyDia.innerHTML += `<tr style="background:#d4edda; font-weight:bold; font-size:14px;">
@@ -1741,14 +2366,39 @@
                 }
                 
                 const itens = c.item.split(' + ').map(i => i.trim());
-                itens.forEach(nomeItem => {
+                
+                // Calcular quantidade total para distribuição proporcional do valor
+                let qtdTotalItens = 0;
+                itens.forEach(itemStr => {
+                    const qtdMatch = itemStr.match(/^(.+?)\s+x(\d+)$/);
+                    const quantidade = qtdMatch ? parseInt(qtdMatch[2]) : 1;
+                    qtdTotalItens += quantidade;
+                });
+                
+                // Distribuir valor proporcionalmente
+                itens.forEach(itemStr => {
+                    const qtdMatch = itemStr.match(/^(.+?)\s+x(\d+)$/);
+                    let nomeItem, quantidade;
+                    
+                    if (qtdMatch) {
+                        nomeItem = qtdMatch[1];
+                        quantidade = parseInt(qtdMatch[2]);
+                    } else {
+                        nomeItem = itemStr;
+                        quantidade = 1;
+                    }
+                    
                     const produto = PRODUTOS.find(p => p.nome.toUpperCase() === nomeItem.toUpperCase());
                     if (produto) {
+                        // Valor proporcional baseado no valor real do consumo
+                        const valorProporcional = (c.valor * quantidade) / qtdTotalItens;
+                        
                         if (!consumoPorBebida[nomeItem]) {
-                            consumoPorBebida[nomeItem] = { qtd: 0, valor: produto.valor };
+                            consumoPorBebida[nomeItem] = { qtd: 0, valorTotal: 0 };
                         }
-                        consumoPorBebida[nomeItem].qtd += 1;
-                        valorTotal += produto.valor;
+                        consumoPorBebida[nomeItem].qtd += quantidade;
+                        consumoPorBebida[nomeItem].valorTotal += valorProporcional;
+                        valorTotal += valorProporcional;
                     }
                 });
             });
@@ -1758,7 +2408,7 @@
             } else {
                 Object.keys(consumoPorBebida).sort().forEach(nomeItem => {
                     const item = consumoPorBebida[nomeItem];
-                    const totalItem = (item.qtd * item.valor);
+                    const totalItem = item.valorTotal;
                     const percentual = valorTotal > 0 ? ((totalItem / valorTotal) * 100).toFixed(1) : 0;
                     tbodyBebida.innerHTML += `<tr>
                         <td><strong>${nomeItem}</strong></td>
@@ -2053,7 +2703,7 @@
                 doc.setDrawColor(0);
                 doc.line(14, 31, 270, 31);
                 
-                // Consolidação por bebida
+                // Consolidação por bebida - RESPEITANDO VALOR REAL
                 const consumoPorBebida = {};
                 let valorTotal = 0;
                 
@@ -2062,14 +2712,39 @@
                         return;
                     }
                     const itens = c.item.split(' + ').map(i => i.trim());
-                    itens.forEach(nomeItem => {
+                    
+                    // Calcular quantidade total para distribuição proporcional
+                    let qtdTotalItens = 0;
+                    itens.forEach(itemStr => {
+                        const qtdMatch = itemStr.match(/^(.+?)\s+x(\d+)$/);
+                        const quantidade = qtdMatch ? parseInt(qtdMatch[2]) : 1;
+                        qtdTotalItens += quantidade;
+                    });
+                    
+                    // Distribuir valor proporcionalmente
+                    itens.forEach(itemStr => {
+                        const qtdMatch = itemStr.match(/^(.+?)\s+x(\d+)$/);
+                        let nomeItem, quantidade;
+                        
+                        if (qtdMatch) {
+                            nomeItem = qtdMatch[1];
+                            quantidade = parseInt(qtdMatch[2]);
+                        } else {
+                            nomeItem = itemStr;
+                            quantidade = 1;
+                        }
+                        
                         const produto = PRODUTOS.find(p => p.nome.toUpperCase() === nomeItem.toUpperCase());
                         if (produto) {
+                            // Valor proporcional baseado no valor real do consumo
+                            const valorProporcional = (c.valor * quantidade) / qtdTotalItens;
+                            
                             if (!consumoPorBebida[nomeItem]) {
-                                consumoPorBebida[nomeItem] = { qtd: 0, valor: produto.valor };
+                                consumoPorBebida[nomeItem] = { qtd: 0, valorTotal: 0 };
                             }
-                            consumoPorBebida[nomeItem].qtd += 1;
-                            valorTotal += produto.valor;
+                            consumoPorBebida[nomeItem].qtd += quantidade;
+                            consumoPorBebida[nomeItem].valorTotal += valorProporcional;
+                            valorTotal += valorProporcional;
                         }
                     });
                 });
@@ -2084,13 +2759,14 @@
                     
                     Object.keys(consumoPorBebida).sort().forEach(nomeItem => {
                         const item = consumoPorBebida[nomeItem];
-                        const totalItem = item.qtd * item.valor;
+                        const totalItem = item.valorTotal;
+                        const valorUnitario = item.valorTotal / item.qtd;
                         const percentual = valorTotal > 0 ? ((totalItem / valorTotal) * 100).toFixed(1) : 0;
                         
                         tableData.push([
                             nomeItem,
                             `${item.qtd}x`,
-                            `R$ ${item.valor.toFixed(2).replace('.', ',')}`,
+                            `R$ ${valorUnitario.toFixed(2).replace('.', ',')}`,
                             `R$ ${totalItem.toFixed(2).replace('.', ',')}`,
                             `${percentual}%`
                         ]);
@@ -2136,6 +2812,7 @@
             if (e.target == document.getElementById('editProductsModal')) closeEditProductsModal(); 
             if (e.target == document.getElementById('whatsappModal')) document.getElementById('whatsappModal').style.display = 'none';
             if (e.target == document.getElementById('editarConsumoModal')) closeEditarConsumoModal();
+            if (e.target == document.getElementById('editarLancamentoModal')) closeEditarLancamentoModal();
         }
         window.addEventListener('load', init);
     </script>
