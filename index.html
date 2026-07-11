@@ -35,6 +35,7 @@
         .status-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
         .status-paid { background: #e8f5e9; color: #2e7d32; }
         .status-unpaid { background: #ffebee; color: #c62828; }
+        .status-entrada-inicial { background: #c8e6c9; color: #1b5e20; font-weight: 700; border-left: 3px solid #4caf50; padding: 6px 10px; }
         .status-badge:hover { transform: scale(1.05); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
         .status-badge:active { transform: scale(0.98); }
         .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
@@ -334,7 +335,54 @@
                 <button class="btn btn-primary" onclick="cadastrarEstoqueInicial()" style="width: 100%;">✅ Registrar Estoque Inicial</button>
             </div>
 
+            <div class="section-box" style="background-color: #f0f8ff; border-left: 4px solid #2196F3;">
+                <h3>📥 Registrar Reposição (Entrada)</h3>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Registre compras e reabastecimentos de produtos.</p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 15px;">
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px;">Produto</label>
+                        <select id="produtoReposicao" style="width: 100%;">
+                            <option value="">-- Selecione um Produto --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px;">Quantidade (unidades)</label>
+                        <input type="number" id="quantidadeReposicao" placeholder="Ex: 12" min="1" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px;">Data e Hora</label>
+                        <input type="datetime-local" id="dataHoraReposicao" style="width: 100%;">
+                    </div>
+                </div>
+                <button class="btn btn-success" onclick="registrarReposicao()" style="width: 100%;">📦 Registrar Reposição</button>
+            </div>
+
+            <div class="section-box" style="background-color: #fff3e0; border-left: 4px solid #ff9800;">
+                <h3>📤 Registrar Saída Manual</h3>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Registre saídas adicionais que não sejam consumo (estrago, perdas, etc).</p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 15px;">
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px;">Produto</label>
+                        <select id="produtoSaida" style="width: 100%;">
+                            <option value="">-- Selecione um Produto --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px;">Quantidade (unidades)</label>
+                        <input type="number" id="quantidadeSaida" placeholder="Ex: 5" min="1" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px;">Data e Hora</label>
+                        <input type="datetime-local" id="dataHoraSaida" style="width: 100%;">
+                    </div>
+                </div>
+                <button class="btn btn-warning" onclick="registrarSaidaManual()" style="width: 100%;">❌ Registrar Saída</button>
+            </div>
+
             <h3 style="margin-top: 30px;">📈 Estoque Atual por Produto</h3>
+            <p style="font-size: 12px; color: #666; margin-bottom: 15px; background: #f5f5f5; padding: 10px; border-radius: 4px;">
+                <strong>Fórmula:</strong> Estoque Inicial - Saídas no Período + Reposições = Saldo Atual
+            </p>
             
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-top: 20px;" id="containerEstoqueAtual"></div>
 
@@ -687,8 +735,16 @@
             let tentativas = 3;
             while (tentativas > 0) {
                 try {
-                    await firebaseDB.ref('gremio').set({members, payments, consumoSala});
-                    console.log('✅ Sincronizado com Firebase');
+                    // ✅ CORRIGIDO: Incluir estoqueInicial, estoqueMovimentacoes e PRODUTOS
+                    await firebaseDB.ref('gremio').set({
+                        members, 
+                        payments, 
+                        consumoSala,
+                        estoqueInicial,        // ✅ NOVO
+                        estoqueMovimentacoes,  // ✅ NOVO
+                        PRODUTOS               // ✅ NOVO
+                    });
+                    console.log('✅ Sincronizado com Firebase (incluindo estoque)');
                     return true;
                 } catch(e) {
                     tentativas--;
@@ -717,8 +773,14 @@
                     members = data.members || [];
                     payments = data.payments || {};
                     consumoSala = data.consumoSala || [];
+                    // ✅ CORRIGIDO: Carregar estoqueInicial, estoqueMovimentacoes e PRODUTOS
+                    estoqueInicial = data.estoqueInicial || {};
+                    estoqueMovimentacoes = data.estoqueMovimentacoes || [];
+                    if (data.PRODUTOS && data.PRODUTOS.length > 0) {
+                        PRODUTOS = data.PRODUTOS;
+                    }
                     if (members.length > 0) {
-                        console.log('✅ Dados carregados do Firebase');
+                        console.log('✅ Dados carregados do Firebase (incluindo estoque)');
                         return true;
                     }
                 }
@@ -798,6 +860,26 @@
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             if(document.getElementById(tabId)) document.getElementById(tabId).classList.add('active');
             if(document.getElementById(`btn-tab-${tabId}`)) document.getElementById(`btn-tab-${tabId}`).classList.add('active');
+            
+            // Se é a aba de estoque, pré-preencher datas com agora
+            if(tabId === 'controle-estoque') {
+                preencherDataAtual('dataHoraEstoque');
+                preencherDataAtual('dataHoraReposicao');
+                preencherDataAtual('dataHoraSaida');
+            }
+        }
+
+        function preencherDataAtual(elementId) {
+            const elemento = document.getElementById(elementId);
+            if (elemento && !elemento.value) {
+                const agora = new Date();
+                const ano = agora.getFullYear();
+                const mes = String(agora.getMonth() + 1).padStart(2, '0');
+                const dia = String(agora.getDate()).padStart(2, '0');
+                const hora = String(agora.getHours()).padStart(2, '0');
+                const minuto = String(agora.getMinutes()).padStart(2, '0');
+                elemento.value = `${ano}-${mes}-${dia}T${hora}:${minuto}`;
+            }
         }
 
         function triggerImport(id) { if(document.getElementById(id)) document.getElementById(id).click(); }
@@ -1192,7 +1274,7 @@
                 dataHora: dataHoraObj.getTime(),
                 dataHoraFormatada: dataHoraObj.toLocaleString('pt-BR'),
                 produto: produto,
-                tipo: 'ENTRADA',
+                tipo: 'ENTRADA INICIAL',
                 quantidade: quantidade
             });
             
@@ -1207,13 +1289,125 @@
             showSuccess(`✅ Estoque inicial de ${produto} cadastrado!`);
         }
 
+        function registrarReposicao() {
+            const produtoSelect = document.getElementById('produtoReposicao');
+            const quantidade = parseInt(document.getElementById('quantidadeReposicao').value);
+            const dataHora = document.getElementById('dataHoraReposicao').value;
+            
+            if (!produtoSelect.value || !quantidade || !dataHora) {
+                showError('❌ Preencha todos os campos!');
+                return;
+            }
+            
+            const produto = produtoSelect.value;
+            const dataHoraObj = new Date(dataHora);
+            
+            // Registrar como movimentação REPOSIÇÃO
+            estoqueMovimentacoes.push({
+                dataHora: dataHoraObj.getTime(),
+                dataHoraFormatada: dataHoraObj.toLocaleString('pt-BR'),
+                produto: produto,
+                tipo: 'REPOSIÇÃO',
+                quantidade: quantidade
+            });
+            
+            saveStorage();
+            renderEstoqueAtual();
+            renderHistoricoEstoque();
+            
+            // Limpar campos
+            document.getElementById('quantidadeReposicao').value = '';
+            document.getElementById('dataHoraReposicao').value = '';
+            
+            showSuccess(`✅ Reposição de ${quantidade} un. de ${produto} registrada!`);
+        }
+
+        function registrarSaidaManual() {
+            const produtoSelect = document.getElementById('produtoSaida');
+            const quantidade = parseInt(document.getElementById('quantidadeSaida').value);
+            const dataHora = document.getElementById('dataHoraSaida').value;
+            
+            if (!produtoSelect.value || !quantidade || !dataHora) {
+                showError('❌ Preencha todos os campos!');
+                return;
+            }
+            
+            const produto = produtoSelect.value;
+            const dataHoraObj = new Date(dataHora);
+            
+            // Registrar como movimentação SAÍDA MANUAL
+            estoqueMovimentacoes.push({
+                dataHora: dataHoraObj.getTime(),
+                dataHoraFormatada: dataHoraObj.toLocaleString('pt-BR'),
+                produto: produto,
+                tipo: 'SAÍDA MANUAL',
+                quantidade: quantidade
+            });
+            
+            saveStorage();
+            renderEstoqueAtual();
+            renderHistoricoEstoque();
+            
+            // Limpar campos
+            document.getElementById('quantidadeSaida').value = '';
+            document.getElementById('dataHoraSaida').value = '';
+            
+            showSuccess(`✅ Saída de ${quantidade} un. de ${produto} registrada!`);
+        }
+
+        // ==================== PARSER ROBUSTO DE DATAS ====================
+        function parseDataBR(dataStr) {
+            if (!dataStr) return null;
+            
+            let data;
+            
+            // Formato DD/MM/YYYY
+            if (dataStr.includes('/')) {
+                const partes = dataStr.split('/');
+                if (partes.length >= 3) {
+                    const dia = parseInt(partes[0]);
+                    const mes = parseInt(partes[1]);
+                    const ano = parseInt(partes[2]);
+                    if (dia && mes && ano) {
+                        data = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+                    }
+                }
+            }
+            // Formato YYYY-MM-DD
+            else if (dataStr.includes('-')) {
+                const partes = dataStr.split('-');
+                if (partes.length >= 3) {
+                    const ano = parseInt(partes[0]);
+                    const mes = parseInt(partes[1]);
+                    const dia = parseInt(partes[2]);
+                    if (dia && mes && ano) {
+                        data = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+                    }
+                }
+            }
+            
+            if (data && !isNaN(data.getTime())) {
+                return data.getTime();
+            }
+            
+            console.warn('⚠️ Erro ao parsear data:', dataStr);
+            return null;
+        }
+
+        // ==================== NORMALIZAR DATA (APENAS DATA, SEM HORA) ====================
+        function toDateOnly(timestamp) {
+            if (!timestamp) return 0;
+            const date = new Date(timestamp);
+            return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+        }
+
         function calcularEstoqueAtual(produto) {
             let saldoAtual = 0;
-            
-            // Começar com estoque inicial mais recente antes de agora
             const agora = Date.now();
             let maiorDataEstoqueInicial = 0;
             
+            // ==================== ESTOQUE INICIAL ====================
+            // Se há estoque inicial, usar o mais recente
             if (estoqueInicial[produto]) {
                 for (let entrada of estoqueInicial[produto]) {
                     if (entrada.dataHora <= agora && entrada.dataHora > maiorDataEstoqueInicial) {
@@ -1222,39 +1416,125 @@
                     }
                 }
             }
+            // Se não há estoque inicial, começar do 0 e processar consumos desde sempre
             
-            // Se não há estoque inicial, retornar 0
-            if (maiorDataEstoqueInicial === 0) return 0;
-            
-            // Processar consumos APÓS a data do estoque inicial
-            consumoSala.forEach(consumo => {
-                const dataConsumo = new Date(consumo.data).getTime();
-                
-                // Consumo deve ser após estoque inicial e antes de agora
-                if (dataConsumo >= maiorDataEstoqueInicial && dataConsumo <= agora) {
-                    const itens = consumo.item.split(' + ').map(i => i.trim());
-                    if (itens.includes(produto)) {
-                        saldoAtual--;
+            // ==================== REPOSIÇÕES ====================
+            // Processar REPOSIÇÕES
+            // Se há data de estoque inicial, apenas após essa data
+            // Se não há estoque inicial, processar todas
+            estoqueMovimentacoes.forEach(mov => {
+                if (mov.produto === produto && mov.tipo === 'REPOSIÇÃO') {
+                    if (maiorDataEstoqueInicial === 0 || (mov.dataHora >= maiorDataEstoqueInicial && mov.dataHora <= agora)) {
+                        saldoAtual += mov.quantidade;
                     }
                 }
             });
             
-            return Math.max(0, saldoAtual);
+            // ==================== SAÍDAS MANUAIS ====================
+            // Processar SAÍDAS MANUAIS
+            estoqueMovimentacoes.forEach(mov => {
+                if (mov.produto === produto && mov.tipo === 'SAÍDA MANUAL') {
+                    if (maiorDataEstoqueInicial === 0 || (mov.dataHora >= maiorDataEstoqueInicial && mov.dataHora <= agora)) {
+                        saldoAtual -= mov.quantidade;
+                    }
+                }
+            });
+            
+            // ==================== CONSUMOS (COM SUPORTE A QUANTIDADE) ====================
+            // Processar consumos SEMPRE (mesmo sem estoque inicial)
+            consumoSala.forEach(consumo => {
+                // ✅ VALIDAÇÃO: Verificar se consumo tem data
+                if (!consumo.data) {
+                    console.warn('⚠️ Consumo sem data encontrado:', consumo);
+                    return;
+                }
+                
+                // ✅ PARSE ROBUSTO: Usar função parseDataBR ao invés de new Date()
+                const dataConsumo = parseDataBR(consumo.data);
+                if (!dataConsumo) {
+                    console.warn('⚠️ Erro ao parsear data do consumo:', consumo.data, consumo);
+                    return;
+                }
+                
+                // ✅ NORMALIZAR DATAS: Comparar apenas datas (sem hora)
+                const dataConsumoOnly = toDateOnly(dataConsumo);
+                const maiorDataOnly = toDateOnly(maiorDataEstoqueInicial);
+                const agoraOnly = toDateOnly(agora);
+                
+                // Se há estoque inicial, apenas consumos após essa data
+                // Se não há estoque inicial, processar todos os consumos
+                if (maiorDataEstoqueInicial === 0 || (dataConsumoOnly >= maiorDataOnly && dataConsumoOnly <= agoraOnly)) {
+                    const itens = consumo.item.split(' + ').map(i => i.trim());
+                    
+                    itens.forEach(itemStr => {
+                        // Parse: "Coca Cola 2L x3" ou apenas "Coca Cola 2L"
+                        const match = itemStr.match(/^(.+?)\s+x(\d+)$/);
+                        const nomeProduto = match ? match[1].trim() : itemStr.trim();
+                        const quantidade = match ? parseInt(match[2]) : 1;
+                        
+                        if (nomeProduto === produto) {
+                            saldoAtual -= quantidade;
+                            console.log(`📊 Deducting ${quantidade} of ${nomeProduto} (consumo data: ${consumo.data})`);
+                        }
+                    });
+                }
+            });
+            
+            // ✅ LOG DEBUG: Mostrar saldo final calculado
+            console.log(`📈 Saldo final de ${produto}: ${saldoAtual} unidades`);
+            
+            // Retornar o saldo (pode ser negativo!)
+            return saldoAtual;
         }
 
         function renderEstoqueAtual() {
+            console.log('🔄 Renderizando Estoque Atual...');
             const container = document.getElementById('containerEstoqueAtual');
             if (!container) return;
             
             container.innerHTML = '';
+            let temAlgumCard = false;
             
             PRODUTOS.forEach(produto => {
+                console.log(`🔍 Calculando estoque de ${produto.nome}...`);
                 const saldo = calcularEstoqueAtual(produto.nome);
+                console.log(`✅ ${produto.nome}: ${saldo} unidades`);
                 const temEstoqueInicial = estoqueInicial[produto.nome] && estoqueInicial[produto.nome].length > 0;
                 
-                if (temEstoqueInicial) {
-                    const statusCor = saldo > 5 ? '#4caf50' : (saldo > 0 ? '#ff9800' : '#f44336');
-                    const statusTexto = saldo > 5 ? 'OK' : (saldo > 0 ? 'BAIXO' : 'VAZIO');
+                // Mostrar card se:
+                // 1. Tem estoque inicial OU
+                // 2. Tem saldo diferente de 0 (indica consumo ou reposição sem estoque)
+                if (temEstoqueInicial || saldo !== 0) {
+                    temAlgumCard = true;
+                    
+                    // Determinar cor do status
+                    let statusCor, statusTexto;
+                    
+                    if (!temEstoqueInicial && saldo < 0) {
+                        // Saldo negativo sem estoque inicial = falta
+                        statusCor = '#ff5252';
+                        statusTexto = '⚠️ FALTA INICIAL';
+                    } else if (!temEstoqueInicial && saldo === 0) {
+                        // Sem estoque inicial e sem consumo
+                        statusCor = '#9e9e9e';
+                        statusTexto = '❓ SEM ESTOQUE INICIAL';
+                    } else if (saldo < 0) {
+                        // Saldo negativo com estoque inicial = débito
+                        statusCor = '#ff5252';
+                        statusTexto = '🔴 EM DÉBITO';
+                    } else if (saldo === 0) {
+                        // Saldo zerado
+                        statusCor = '#f44336';
+                        statusTexto = '🔴 VAZIO';
+                    } else if (saldo > 0 && saldo <= 5) {
+                        // Baixo estoque
+                        statusCor = '#ff9800';
+                        statusTexto = '🟡 BAIXO';
+                    } else {
+                        // OK
+                        statusCor = '#4caf50';
+                        statusTexto = '🟢 OK';
+                    }
                     
                     const card = document.createElement('div');
                     card.style.cssText = `
@@ -1265,13 +1545,19 @@
                         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
                     `;
                     
+                    // Mostrar indicador se falta estoque inicial
+                    const avisoEstoque = !temEstoqueInicial 
+                        ? `<div style="font-size: 11px; color: #f44336; margin-bottom: 8px; font-weight: 600;">⚠️ Sem estoque inicial cadastrado</div>` 
+                        : '';
+                    
                     card.innerHTML = `
+                        ${avisoEstoque}
                         <div style="font-weight: 600; color: #333; margin-bottom: 10px;">${produto.nome}</div>
                         <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px;">
                             <span style="font-size: 28px; font-weight: bold; color: ${statusCor};">${saldo}</span>
                             <span style="color: #999; font-size: 12px;">unidades</span>
                         </div>
-                        <div style="background: ${statusCor}; color: white; padding: 3px 8px; border-radius: 4px; display: inline-block; font-size: 11px; font-weight: 600;">
+                        <div style="background: ${statusCor}; color: white; padding: 4px 10px; border-radius: 4px; display: inline-block; font-size: 11px; font-weight: 600;">
                             ${statusTexto}
                         </div>
                         <div style="margin-top: 10px; font-size: 12px; color: #666;">
@@ -1283,8 +1569,8 @@
                 }
             });
             
-            if (container.innerHTML === '') {
-                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #999; padding: 40px;">Nenhum estoque inicial cadastrado ainda.</div>';
+            if (!temAlgumCard) {
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #999; padding: 40px;">Nenhum estoque cadastrado ainda. Registre um estoque inicial para começar.</div>';
             }
         }
 
@@ -1304,7 +1590,7 @@
                         dataHora: entrada.dataHora,
                         dataHoraFormatada: entrada.dataHoraFormatada,
                         produto: produto,
-                        tipo: 'ENTRADA',
+                        tipo: 'ENTRADA INICIAL',
                         quantidade: entrada.quantidade
                     });
                 });
@@ -1331,6 +1617,22 @@
                 });
             });
             
+            // Adicionar movimentações manuais (REPOSIÇÃO e SAÍDA MANUAL)
+            if (estoqueMovimentacoes) {
+                estoqueMovimentacoes.forEach(mov => {
+                    // Pular entradas iniciais pois já foram adicionadas
+                    if (mov.tipo !== 'ENTRADA INICIAL') {
+                        todasMovimentacoes.push({
+                            dataHora: mov.dataHora,
+                            dataHoraFormatada: mov.dataHoraFormatada,
+                            produto: mov.produto,
+                            tipo: mov.tipo,
+                            quantidade: mov.quantidade
+                        });
+                    }
+                });
+            }
+            
             if (todasMovimentacoes.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">Nenhuma movimentação registrada.</td></tr>';
                 return;
@@ -1348,12 +1650,21 @@
                 if (!porData[chaveData][chaveProduto]) {
                     porData[chaveData][chaveProduto] = {
                         nome: mov.produto,
+                        movimentacoes: [],
                         entradas: 0,
                         saidas: 0
                     };
                 }
                 
-                if (mov.tipo === 'ENTRADA') {
+                // Armazenar tipo específico de movimento
+                porData[chaveData][chaveProduto].movimentacoes.push({
+                    tipo: mov.tipo,
+                    quantidade: mov.quantidade,
+                    dataHora: mov.dataHora
+                });
+                
+                // Determinar se é entrada ou saída
+                if (mov.tipo === 'ENTRADA' || mov.tipo === 'ENTRADA INICIAL' || mov.tipo === 'REPOSIÇÃO') {
                     porData[chaveData][chaveProduto].entradas += mov.quantidade;
                 } else {
                     porData[chaveData][chaveProduto].saidas += mov.quantidade;
@@ -1372,9 +1683,35 @@
                     const mov = produtosDodia[chave];
                     const saldoAposMov = calcularEstoqueAtual(mov.nome);
                     
-                    // Determinar tipo (entrada ou saída)
+                    // Determinar tipo específico baseado nas movimentações registradas
                     let tipoDisplay, tipoClass, tipoIcon;
-                    if (mov.entradas > 0 && mov.saidas === 0) {
+                    
+                    // Se há movimentações, usar o tipo específico
+                    if (mov.movimentacoes.length > 0) {
+                        const primeiravMov = mov.movimentacoes[0];
+                        
+                        if (primeiravMov.tipo === 'ENTRADA INICIAL') {
+                            tipoDisplay = '✅ ENTRADA INICIAL';
+                            tipoClass = 'status-entrada-inicial';
+                            tipoIcon = '📦';
+                        } else if (primeiravMov.tipo === 'REPOSIÇÃO') {
+                            tipoDisplay = '📤 REPOSIÇÃO';
+                            tipoClass = 'status-paid';
+                            tipoIcon = '📦';
+                        } else if (primeiravMov.tipo === 'SAÍDA MANUAL') {
+                            tipoDisplay = '❌ SAÍDA MANUAL';
+                            tipoClass = 'status-unpaid';
+                            tipoIcon = '➖';
+                        } else if (primeiravMov.tipo === 'SAÍDA') {
+                            tipoDisplay = '🥤 CONSUMO';
+                            tipoClass = 'status-unpaid';
+                            tipoIcon = '🥤';
+                        } else {
+                            tipoDisplay = primeiravMov.tipo;
+                            tipoClass = 'status-unpaid';
+                            tipoIcon = '⚙️';
+                        }
+                    } else if (mov.entradas > 0 && mov.saidas === 0) {
                         tipoDisplay = 'ENTRADA';
                         tipoClass = 'status-paid';
                         tipoIcon = '➕';
@@ -1391,6 +1728,14 @@
                     // Quantidade a exibir
                     const quantidade = mov.entradas > 0 ? mov.entradas : mov.saidas;
                     
+                    // Extrair tipo real e dataHora do primeiro movimento para remoção
+                    let tipoReal = 'ENTRADA';
+                    let dataHoraReal = 0;
+                    if (mov.movimentacoes.length > 0) {
+                        tipoReal = mov.movimentacoes[0].tipo;
+                        dataHoraReal = mov.movimentacoes[0].dataHora;
+                    }
+                    
                     const dataCell = primeiraLinhaData 
                         ? `<td style="font-weight:bold; background:#f0f0f0;">${data}</td>` 
                         : `<td style="background:#f0f0f0;"></td>`;
@@ -1402,7 +1747,7 @@
                         <td style="text-align: center; font-weight: bold;">${quantidade}</td>
                         <td style="font-weight: 600; color: #071D49;">${saldoAposMov} unid.</td>
                         <td>
-                            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="removerMovimentacaoEstoque('${data}', '${mov.nome.replace(/'/g, "\\'")}', '${tipoDisplay}')">🗑️</button>
+                            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="removerMovimentacaoEstoque(${dataHoraReal}, '${mov.nome.replace(/'/g, "\\'")}', '${tipoReal}')">🗑️</button>
                         </td>
                     </tr>`;
                     
@@ -1429,9 +1774,9 @@
         function removerMovimentacaoEstoque(dataHora, produto, tipo) {
             if (!confirm(`Remover movimentação de ${tipo} de ${produto}?`)) return;
             
-            const dataHoraNum = parseFloat(dataHora);
+            const dataHoraNum = dataHora; // Já é um número (timestamp)
             
-            if (tipo === 'ENTRADA') {
+            if (tipo === 'ENTRADA INICIAL' || tipo === 'ENTRADA') {
                 if (estoqueInicial[produto]) {
                     estoqueInicial[produto] = estoqueInicial[produto].filter(e => e.dataHora !== dataHoraNum);
                 }
@@ -1447,6 +1792,32 @@
 
         function popularProdutosEstoque() {
             const select = document.getElementById('produtoEstoque');
+            if (!select) return;
+            
+            select.innerHTML = '<option value="">-- Selecione um Produto --</option>';
+            PRODUTOS.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.nome;
+                option.textContent = p.nome;
+                select.appendChild(option);
+            });
+        }
+
+        function popularProdutosReposicao() {
+            const select = document.getElementById('produtoReposicao');
+            if (!select) return;
+            
+            select.innerHTML = '<option value="">-- Selecione um Produto --</option>';
+            PRODUTOS.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.nome;
+                option.textContent = p.nome;
+                select.appendChild(option);
+            });
+        }
+
+        function popularProdutosSaida() {
+            const select = document.getElementById('produtoSaida');
             if (!select) return;
             
             select.innerHTML = '<option value="">-- Selecione um Produto --</option>';
@@ -1487,7 +1858,8 @@
             try {
                 renderMensalidadesTableHeader(); renderMensalidadesTableBody(); renderStatsMensalidades();
                 renderProdutosPrecos(); renderEditarConsumoTable(); renderRelatorioEstoque(); renderConfigMembersList();
-                renderEstoqueAtual(); renderHistoricoEstoque(); popularProdutosEstoque();
+                renderEstoqueAtual(); renderHistoricoEstoque(); 
+                popularProdutosEstoque(); popularProdutosReposicao(); popularProdutosSaida();
             } catch(e) { console.error(e); }
         }
 
