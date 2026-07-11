@@ -244,6 +244,7 @@
             
             <div class="section-box" style="margin-top: 20px;">
                 <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Visualize e edite todos os lançamentos de consumo. Clique em ✏️ para editar ou 🗑️ para deletar cada item.</p>
+                <div id="avisoPessoasNaoCadastradas"></div>
                 <div class="table-wrapper">
                     <table class="payment-table">
                         <thead>
@@ -943,6 +944,7 @@
                     const text = evt.target.result;
                     const linhas = text.split(/\r?\n/);
                     let count = 0;
+                    let countNaoCadastrado = 0;
 
                     linhas.forEach(linha => {
                         const colunas = parseCSVLine(linha);
@@ -955,7 +957,16 @@
 
                             if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr) || /^\d{2}\/\d{2}\/\d{2}$/.test(dataStr)) {
                                 const mesIndex = parseInt(dataStr.split('/')[1], 10) - 1;
-                                const membro = encontrarMembroPorTexto(descricao);
+                                
+                                // ✅ PRIMEIRO: Tentar encontrar membro cadastrado
+                                let membro = encontrarMembroPorTexto(descricao);
+                                let nãoCadastrado = false;
+                                
+                                // ✅ SEGUNDO: Se não encontrou cadastrado, usar o nome da descrição
+                                if (!membro) {
+                                    membro = descricao;
+                                    nãoCadastrado = true;
+                                }
 
                                 if (membro && mesIndex >= 0 && mesIndex <= 11) {
                                     const jaExiste = consumoSala.some(c => c.membro === membro && c.data === dataStr && Math.abs(c.valorOriginal - valorPago) < 0.01);
@@ -970,9 +981,11 @@
                                             item: itensDeduzidos.join(' + '),
                                             valor: valorPago,
                                             data: dataStr,
-                                            valorOriginal: valorPago
+                                            valorOriginal: valorPago,
+                                            nãoCadastrado: nãoCadastrado
                                         });
                                         count++;
+                                        if (nãoCadastrado) countNaoCadastrado++;
                                     }
                                 }
                             }
@@ -981,7 +994,12 @@
 
                     if (count > 0) { 
                         saveStorage(); renderAll(); 
-                        showSuccess(`✅ ${count} transferências de consumo identificadas com sucesso!`); 
+                        let msg = `✅ ${count} lançamentos importados`;
+                        if (countNaoCadastrado > 0) {
+                            msg += ` (⚠️ ${countNaoCadastrado} com nomes não cadastrados - em vermelho)`;
+                        }
+                        msg += '!';
+                        showSuccess(msg); 
                     } else { 
                         showError("⚠️ Nenhum consumo novo foi localizado no CSV."); 
                     }
@@ -1600,6 +1618,23 @@
             if(!tbody) return; 
             tbody.innerHTML = '';
             
+            // ✅ Verificar se há consumos com nomes não cadastrados
+            const consumosNaoCadastrados = consumoSala.filter(c => c.nãoCadastrado);
+            if (consumosNaoCadastrados.length > 0) {
+                const avisoDiv = document.getElementById('avisoPessoasNaoCadastradas');
+                if (avisoDiv) {
+                    avisoDiv.innerHTML = `
+                        <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: 12px; border-radius: 4px; margin-bottom: 15px; color: #856404;">
+                            <strong>⚠️ Aviso:</strong> Existem ${consumosNaoCadastrados.length} lançamento(s) com nomes NÃO cadastrados na lista de associados. 
+                            Estas linhas aparecem em <span style="background-color: #ffcccc; padding: 2px 4px; border-radius: 2px;">vermelho</span> abaixo.
+                        </div>
+                    `;
+                }
+            } else {
+                const avisoDiv = document.getElementById('avisoPessoasNaoCadastradas');
+                if (avisoDiv) avisoDiv.innerHTML = '';
+            }
+            
             if (consumoSala.length === 0) { 
                 tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#999;">Nenhum consumo registrado.</td></tr>`; 
                 return; 
@@ -1633,9 +1668,13 @@
                 const subtotal = consumo.valor.toFixed(2);
                 totalGeral += consumo.valor;
                 
-                tbody.innerHTML += `<tr>
+                // ✅ DESTACAR EM VERMELHO se membro não está cadastrado
+                const rowStyle = consumo.nãoCadastrado ? 'background-color: #ffcccc; border-left: 4px solid #ff5252;' : '';
+                const memberStyle = consumo.nãoCadastrado ? 'color: #d32f2f; font-weight: bold;' : '';
+                
+                tbody.innerHTML += `<tr style="${rowStyle}">
                     <td style="font-weight:bold;">${consumo.data}</td>
-                    <td><strong>${consumo.membro}</strong></td>
+                    <td><strong style="${memberStyle}">${consumo.membro}${consumo.nãoCadastrado ? ' ⚠️' : ''}</strong></td>
                     <td>${consumo.mes}</td>
                     <td>${consumo.item}</td>
                     <td>R$ ${consumo.valor.toFixed(2).replace('.', ',')}</td>
@@ -2477,8 +2516,20 @@
                 const doc = new jsPDF();
                 
                 const hoje = new Date();
-                const mesAtualIndex = hoje.getMonth();
-                const nomeMesCorrente = MONTHS[mesAtualIndex].toUpperCase();
+                
+                // ✅ RESPEITAR O FILTRO SELECIONADO
+                let mesSelecionado = '';
+                let mesIndex = -1;
+                
+                if (filtroMesMensalidades) {
+                    // Mês específico selecionado
+                    mesIndex = parseInt(filtroMesMensalidades);
+                    mesSelecionado = MONTHS[mesIndex].toUpperCase();
+                } else {
+                    // "Todos os Meses" selecionado
+                    mesSelecionado = 'TODOS OS MESES';
+                    mesIndex = -1; // Flag para "todos"
+                }
                 
                 // Cabeçalho
                 doc.setFontSize(16);
@@ -2488,140 +2539,235 @@
                 doc.setFontSize(10);
                 doc.setFont(undefined, 'normal');
                 doc.text(`Gerado em: ${hoje.toLocaleDateString('pt-BR')}`, 14, 30);
-                doc.text(`Grêmio Policial - 3º BPM`, 14, 37);
+                doc.text(`Grêmio Policial - 3º BPM | Período: ${mesSelecionado}`, 14, 37);
                 
                 // Separador
                 doc.setDrawColor(0);
                 doc.line(14, 40, 196, 40);
                 
-                // Criar dados com marcadores para coloring
+                // Criar dados da tabela
                 let tableDataWithStyles = [];
-                tableDataWithStyles.push(['Membro', 'Status Mês Atual', 'Total Quitado']);
                 
-                let totalGeral = 0;
-                let quitadosMesCorrente = 0;
-                
-                members.forEach(m => {
-                    const pago = payments[m] && payments[m][mesAtualIndex];
-                    const status = pago ? 'PAGO' : 'PENDENTE';
+                if (mesIndex === -1) {
+                    // TODOS OS MESES - COM INDICADORES VISUAIS DE CÍRCULOS
+                    tableDataWithStyles.push(['Membro', 'Meses Pagos', 'Total Arrecadado']);
                     
-                    let totalMembro = 0;
-                    if (payments[m]) {
-                        Object.keys(payments[m]).forEach(mesIdx => {
-                            if (payments[m][mesIdx]) totalMembro++;
+                    let totalGeralMeses = 0;
+                    let membersData = [];
+                    
+                    members.forEach(m => {
+                        let totalMembro = 0;
+                        if (payments[m]) {
+                            Object.keys(payments[m]).forEach(mesIdx => {
+                                if (payments[m][mesIdx]) totalMembro++;
+                            });
+                        }
+                        totalGeralMeses += totalMembro;
+                        membersData.push({
+                            nome: m,
+                            totalMeses: totalMembro,
+                            totalArrecadado: totalMembro * 30,
+                            statusPorMes: payments[m] || {}
                         });
-                    }
+                    });
                     
-                    if (pago) quitadosMesCorrente++;
-                    totalGeral += totalMembro;
+                    // Desenhar tabela
+                    let yPos = 50;
+                    const colX = [14, 95, 175];  // Aumentei espaço para coluna de meses
+                    const colWidths = [81, 80, 35];
+                    const rowHeight = 10;  // Aumentei altura para os círculos
+                    const circleRadius = 1.5;  // Raio dos círculos
+                    const circleSpacing = 6.5;  // Espaçamento entre círculos
                     
-                    tableDataWithStyles.push([m, status, `${totalMembro} mês(es)`]);
-                });
-                
-                // Desenhar tabela manualmente com controle total de cores
-                let yPos = 50;
-                const colX = [14, 100, 160];
-                const colWidths = [86, 60, 42];
-                const rowHeight = 8;
-                
-                // Cabeçalho
-                doc.setFillColor(7, 29, 73);
-                doc.setTextColor(255, 205, 5);
-                doc.setFont('helvetica', 'bold');
-                doc.setFontSize(9);
-                
-                // Desenhar fundo do cabeçalho
-                doc.rect(colX[0], yPos - 5, colX[1] + colWidths[1] + colWidths[0] - 14, rowHeight, 'F');
-                
-                // Textos do cabeçalho
-                doc.text('Membro', colX[0] + 2, yPos);
-                doc.text('Status Mês Atual', colX[1] + 2, yPos);
-                doc.text('Total Quitado', colX[2] + 2, yPos);
-                
-                yPos += rowHeight;
-                
-                // Linhas da tabela
-                doc.setFontSize(9);
-                doc.setFont('helvetica', 'normal');
-                
-                tableDataWithStyles.slice(1).forEach((row, idx) => {
-                    // Fundo alternado
-                    if (idx % 2 === 0) {
-                        doc.setFillColor(240, 240, 240);
-                    } else {
-                        doc.setFillColor(255, 255, 255);
-                    }
+                    // Cabeçalho
+                    doc.setFillColor(7, 29, 73);
+                    doc.setTextColor(255, 205, 5);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(8);
                     doc.rect(colX[0], yPos - 5, colX[1] + colWidths[1] + colWidths[0] - 14, rowHeight, 'F');
-                    
-                    // Texto nome (preto normal)
-                    doc.setTextColor(0, 0, 0);
-                    doc.setFont('helvetica', 'normal');
-                    doc.text(row[0], colX[0] + 2, yPos);
-                    
-                    // Texto Status (com cor e negrito)
-                    if (row[1] === 'PAGO') {
-                        doc.setTextColor(46, 125, 50); // Verde
-                        doc.setFont('helvetica', 'bold');
-                        doc.text('PAGO', colX[1] + 2, yPos);
-                    } else if (row[1] === 'PENDENTE') {
-                        doc.setTextColor(198, 40, 40); // Vermelho
-                        doc.setFont('helvetica', 'bold');
-                        doc.text('PENDENTE', colX[1] + 2, yPos);
-                    }
-                    
-                    // Texto Total (preto normal)
-                    doc.setTextColor(0, 0, 0);
-                    doc.setFont('helvetica', 'normal');
-                    doc.text(row[2], colX[2] + 2, yPos);
+                    doc.text('Membro', colX[0] + 2, yPos);
+                    doc.text('Jan Fev Mar Abr Mai Jun Jul Ago Set Out Nov Dez', colX[1] + 2, yPos);
+                    doc.text('Total', colX[2] + 2, yPos);
                     
                     yPos += rowHeight;
+                    doc.setFontSize(8);
+                    doc.setFont('helvetica', 'normal');
                     
-                    // Paginação
-                    if (yPos > 280) {
-                        doc.addPage();
-                        yPos = 20;
-                    }
-                });
+                    // Desenhar linhas de dados com círculos
+                    membersData.forEach((mdata, idx) => {
+                        if (idx % 2 === 0) {
+                            doc.setFillColor(240, 240, 240);
+                        } else {
+                            doc.setFillColor(255, 255, 255);
+                        }
+                        doc.rect(colX[0], yPos - 5, colX[1] + colWidths[1] + colWidths[0] - 14, rowHeight, 'F');
+                        
+                        // Nome do membro
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text(mdata.nome, colX[0] + 2, yPos);
+                        
+                        // Desenhar 12 círculos para cada mês
+                        let circleXPos = colX[1] + 1;
+                        for (let mesIdx = 0; mesIdx < 12; mesIdx++) {
+                            const pago = mdata.statusPorMes[mesIdx] ? true : false;
+                            
+                            // Cor do círculo
+                            if (pago) {
+                                doc.setFillColor(76, 175, 80);  // Verde
+                            } else {
+                                doc.setFillColor(244, 67, 54);  // Vermelho
+                            }
+                            
+                            // Desenhar círculo
+                            doc.circle(circleXPos, yPos - 1, circleRadius, 'F');
+                            
+                            circleXPos += circleSpacing;
+                        }
+                        
+                        // Total arrecadado
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text(`R$ ${mdata.totalArrecadado.toFixed(2).replace('.', ',')}`, colX[2] + 2, yPos);
+                        
+                        yPos += rowHeight;
+                        
+                        // Paginação
+                        if (yPos > 270) {
+                            doc.addPage();
+                            yPos = 20;
+                            // Redesenhar cabeçalho na nova página
+                            doc.setFillColor(7, 29, 73);
+                            doc.setTextColor(255, 205, 5);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setFontSize(8);
+                            doc.rect(colX[0], yPos - 5, colX[1] + colWidths[1] + colWidths[0] - 14, rowHeight, 'F');
+                            doc.text('Membro', colX[0] + 2, yPos);
+                            doc.text('Jan Fev Mar Abr Mai Jun Jul Ago Set Out Nov Dez', colX[1] + 2, yPos);
+                            doc.text('Total', colX[2] + 2, yPos);
+                            yPos += rowHeight;
+                        }
+                    });
+                    
+                    // Resumo Geral
+                    yPos += 5;
+                    doc.setFontSize(11);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`RESUMO GERAL`, 14, yPos);
+                    
+                    yPos += 8;
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(`Total de Policiais: ${members.length}`, 14, yPos);
+                    yPos += 7;
+                    doc.text(`Total de Mensalidades Pagas: ${totalGeralMeses}`, 14, yPos);
+                    yPos += 7;
+                    doc.text(`Arrecadação Total: R$ ${(totalGeralMeses * 30).toFixed(2).replace('.', ',')}`, 14, yPos);
+                    
+                    yPos += 10;
+                    doc.setFontSize(9);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFillColor(76, 175, 80);
+                    doc.circle(17, yPos - 1, 1, 'F');
+                    doc.setTextColor(0, 0, 0);
+                    doc.text('Verde = Mês Pago', 20, yPos);
+                    
+                    yPos += 6;
+                    doc.setFillColor(244, 67, 54);
+                    doc.circle(17, yPos - 1, 1, 'F');
+                    doc.setTextColor(0, 0, 0);
+                    doc.text('Vermelho = Mês Pendente', 20, yPos);
+                    
+                } else {
+                    // MÊS ESPECÍFICO
+                    tableDataWithStyles.push(['Membro', 'Status', 'Valor']);
+                    
+                    let totalArrecadado = 0;
+                    let quitados = 0;
+                    
+                    members.forEach(m => {
+                        const pago = payments[m] && payments[m][mesIndex];
+                        const status = pago ? 'PAGO' : 'PENDENTE';
+                        if (pago) {
+                            quitados++;
+                            totalArrecadado += 30;
+                        }
+                        tableDataWithStyles.push([m, status, 'R$ 30,00']);
+                    });
+                    
+                    // Desenhar tabela
+                    let yPos = 50;
+                    const colX = [14, 100, 160];
+                    const colWidths = [86, 60, 42];
+                    const rowHeight = 8;
+                    
+                    // Cabeçalho
+                    doc.setFillColor(7, 29, 73);
+                    doc.setTextColor(255, 205, 5);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(9);
+                    doc.rect(colX[0], yPos - 5, colX[1] + colWidths[1] + colWidths[0] - 14, rowHeight, 'F');
+                    doc.text('Membro', colX[0] + 2, yPos);
+                    doc.text('Status', colX[1] + 2, yPos);
+                    doc.text('Valor', colX[2] + 2, yPos);
+                    
+                    yPos += rowHeight;
+                    doc.setFontSize(9);
+                    doc.setFont('helvetica', 'normal');
+                    
+                    tableDataWithStyles.slice(1).forEach((row, idx) => {
+                        if (idx % 2 === 0) {
+                            doc.setFillColor(240, 240, 240);
+                        } else {
+                            doc.setFillColor(255, 255, 255);
+                        }
+                        doc.rect(colX[0], yPos - 5, colX[1] + colWidths[1] + colWidths[0] - 14, rowHeight, 'F');
+                        
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text(row[0], colX[0] + 2, yPos);
+                        
+                        // Status com cor
+                        if (row[1] === 'PAGO') {
+                            doc.setTextColor(46, 125, 50); // Verde
+                            doc.setFont('helvetica', 'bold');
+                        } else {
+                            doc.setTextColor(198, 40, 40); // Vermelho
+                            doc.setFont('helvetica', 'bold');
+                        }
+                        doc.text(row[1], colX[1] + 2, yPos);
+                        
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text(row[2], colX[2] + 2, yPos);
+                        
+                        yPos += rowHeight;
+                        
+                        if (yPos > 280) {
+                            doc.addPage();
+                            yPos = 20;
+                        }
+                    });
+                    
+                    // Resumo do mês
+                    yPos += 5;
+                    doc.setFontSize(11);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`RESUMO DO MÊS: ${mesSelecionado}`, 14, yPos);
+                    
+                    yPos += 8;
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(`Total de Policiais: ${members.length}`, 14, yPos);
+                    yPos += 7;
+                    doc.text(`Adimplentes: ${quitados}`, 14, yPos);
+                    yPos += 7;
+                    doc.text(`Arrecadação: R$ ${totalArrecadado.toFixed(2).replace('.', ',')}`, 14, yPos);
+                    yPos += 7;
+                    doc.text(`Taxa de Adimplência: ${members.length > 0 ? Math.round((quitados / members.length) * 100) : 0}%`, 14, yPos);
+                }
                 
-                // Desenhar bordas da tabela
-                doc.setDrawColor(0);
-                doc.setLineWidth(0.5);
-                yPos = 50;
-                const totalHeight = (tableDataWithStyles.length) * rowHeight;
-                
-                // Linhas verticais
-                doc.line(colX[0], 45, colX[0], yPos - 5 + totalHeight);
-                doc.line(colX[1], 45, colX[1], yPos - 5 + totalHeight);
-                doc.line(colX[2], 45, colX[2], yPos - 5 + totalHeight);
-                doc.line(colX[2] + colWidths[2], 45, colX[2] + colWidths[2], yPos - 5 + totalHeight);
-                
-                // Linhas horizontais
-                doc.line(colX[0], 45, colX[2] + colWidths[2], 45); // Topo
-                doc.line(colX[0], yPos - 5 + totalHeight, colX[2] + colWidths[2], yPos - 5 + totalHeight); // Fundo
-                
-                yPos = yPos - 5 + totalHeight + 10;
-                
-                // Resumo do mês
-                doc.setFontSize(11);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(0, 0, 0);
-                doc.text(`RESUMO DO MÊS: ${nomeMesCorrente}`, 14, yPos);
-                
-                yPos += 8;
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'normal');
-                doc.text(`Total de Policiais: ${members.length}`, 14, yPos);
-                
-                yPos += 7;
-                doc.text(`Adimplentes (${nomeMesCorrente}): ${quitadosMesCorrente}`, 14, yPos);
-                
-                yPos += 7;
-                doc.text(`Arrecadação Total: R$ ${(totalGeral * 30).toFixed(2).replace('.', ',')}`, 14, yPos);
-                
-                yPos += 7;
-                doc.text(`Taxa de Adimplência: ${members.length > 0 ? Math.round((quitadosMesCorrente / members.length) * 100) : 0}%`, 14, yPos);
-                
-                doc.save(`mensalidades_${hoje.getFullYear()}-${String(mesAtualIndex + 1).padStart(2, '0')}.pdf`);
+                doc.save(`mensalidades_${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}.pdf`);
                 showSuccess('✅ PDF de mensalidades gerado com sucesso!');
             } catch (err) {
                 showError('❌ Erro ao gerar PDF: ' + err.message);
@@ -2914,8 +3060,74 @@
             }
         }
 
-        function showSuccess(m) { const el = document.getElementById('globalSuccess'); if(el) { el.textContent = m; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000); } }
-        function showError(m) { const el = document.getElementById('globalError'); if(el) { el.textContent = m; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 4000); } }
+        function showSuccess(m) { 
+            const el = document.getElementById('globalSuccess'); 
+            if(el) { 
+                el.textContent = m; 
+                el.classList.add('show'); 
+                setTimeout(() => el.classList.remove('show'), 4000); 
+            }
+            // Também mostrar toast flutuante para melhor visibilidade
+            mostrarToastVisivel(m, 'success');
+        }
+        
+        function showError(m) { 
+            const el = document.getElementById('globalError'); 
+            if(el) { 
+                el.textContent = m; 
+                el.classList.add('show'); 
+                setTimeout(() => el.classList.remove('show'), 4000); 
+            }
+        }
+        
+        function mostrarToastVisivel(mensagem, tipo) {
+            const toast = document.createElement('div');
+            toast.style.position = 'fixed';
+            toast.style.top = '20px';
+            toast.style.right = '20px';
+            toast.style.zIndex = '9999';
+            toast.style.padding = '16px 24px';
+            toast.style.borderRadius = '8px';
+            toast.style.fontWeight = 'bold';
+            toast.style.fontSize = '14px';
+            toast.style.boxShadow = '0 8px 24px rgba(0,0,0,0.3)';
+            toast.style.animation = 'slideInRight 0.4s ease-out';
+            
+            if (tipo === 'success') {
+                toast.style.background = '#4caf50';
+                toast.style.color = 'white';
+                toast.style.borderLeft = '4px solid #2e7d32';
+            } else {
+                toast.style.background = '#f44336';
+                toast.style.color = 'white';
+                toast.style.borderLeft = '4px solid #c62828';
+            }
+            
+            toast.textContent = mensagem;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideOutRight 0.4s ease-out';
+                setTimeout(() => toast.remove(), 400);
+            }, 3000);
+        }
+        
+        // Adicionar estilos de animação se não existirem
+        if (!document.getElementById('toastStyles')) {
+            const style = document.createElement('style');
+            style.id = 'toastStyles';
+            style.textContent = `
+                @keyframes slideInRight {
+                    from { transform: translateX(400px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOutRight {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(400px); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
         
         // ================== EDITAR MEMBROS ==================
         function openEditMembersModal() {
@@ -2931,9 +3143,11 @@
             
             let html = '';
             members.forEach((member, index) => {
+                // member pode ser string ou objeto {name: "..."}
+                const memberName = typeof member === 'string' ? member : (member.name || member);
                 html += `
                     <div style="display: flex; gap: 10px; margin-bottom: 12px; padding: 10px; background: white; border-radius: 6px; border: 1px solid #ddd; align-items: center;">
-                        <input type="text" id="memberEdit_${index}" value="${member.name}" placeholder="Nome do associado" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+                        <input type="text" id="memberEdit_${index}" value="${memberName}" placeholder="Nome do associado" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
                         <button type="button" class="btn btn-danger" style="padding: 8px 12px; font-size: 12px; white-space: nowrap;" onclick="deleteMemberFromEdit(${index})">🗑️ Excluir</button>
                     </div>
                 `;
@@ -2948,30 +3162,44 @@
         }
         
         function deleteMemberFromEdit(index) {
-            if (confirm(`Tem certeza que deseja excluir "${members[index].name}"?`)) {
+            // member pode ser string ou objeto {name: "..."}
+            const memberName = typeof members[index] === 'string' ? members[index] : (members[index].name || members[index]);
+            if (confirm(`Tem certeza que deseja excluir "${memberName}"?`)) {
                 members.splice(index, 1);
-                saveToFirebase();
+                saveStorage();
                 openEditMembersModal(); // Recarregar a lista
-                renderConfigTab();
+                renderConfigMembersList();
                 showSuccess('✅ Associado excluído com sucesso!');
             }
         }
         
         function salvarEdicaoMembros() {
-            members.forEach((member, index) => {
-                const input = document.getElementById(`memberEdit_${index}`);
-                if (input) {
-                    const novoNome = input.value.trim();
-                    if (novoNome) {
-                        member.name = novoNome;
+            try {
+                members.forEach((member, index) => {
+                    const input = document.getElementById(`memberEdit_${index}`);
+                    if (input) {
+                        const novoNome = input.value.trim();
+                        if (novoNome) {
+                            // Se é string, substitui direto. Se é objeto, atualiza a propriedade name
+                            if (typeof members[index] === 'string') {
+                                members[index] = novoNome;
+                            } else {
+                                members[index].name = novoNome;
+                            }
+                        }
                     }
-                }
-            });
-            
-            saveToFirebase();
-            renderConfigTab();
-            closeEditMembersModal();
-            showSuccess('✅ Associados atualizados com sucesso!');
+                });
+                
+                saveStorage();
+                renderConfigMembersList();
+                closeEditMembersModal();
+                
+                // Mostrar confirmação visual
+                showSuccess('✅ Associados atualizados com sucesso!');
+            } catch(err) {
+                console.error('Erro ao salvar associados:', err);
+                showError('❌ Erro ao salvar: ' + err.message);
+            }
         }
         
         window.onclick = function(e) { 
